@@ -6,6 +6,9 @@
 #include <ESPmDNS.h>
 #include "ReBLEUtils.h"
 #include "ReBLEConfig.h"
+#include <Matter.h>
+
+MatterOnOffPlugin OnOffPlugin;
 
 std::string botMacAddr = botMac;
 
@@ -101,6 +104,9 @@ void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData,
         response->setLength();
         request->send(response);
     } 
+
+    OnOffPlugin.setOnOff(false);
+    OnOffPlugin.updateAccessory();
 }
 
 /** Handles the provisioning of clients and connects / interfaces with the server */
@@ -356,6 +362,20 @@ void ledOn(CRGB color, uint8_t brightness, bool init)
     AtomS3.update();
 }
 
+// Matter Protocol Endpoint Callback
+bool setPluginOnOff(bool state) {
+    Serial.printf("User Callback :: New Plugin State = %s\r\n", state ? "ON" : "OFF");
+  
+    doCommand = "570100";
+
+    if (state && advDevice)
+    {
+        doConnect = true;
+    }
+
+    return true;
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -472,7 +492,20 @@ void setup()
     // Do not need active scan, only mac address is important during advertisment process
     // pScan->setActiveScan(true);
 
-    /** Start scanning for advertisers */
+    OnOffPlugin.begin();
+    OnOffPlugin.onChange(setPluginOnOff);
+
+    // Matter beginning - Last step, after all EndPoints are initialized
+    Matter.begin();
+    // This may be a restart of a already commissioned Matter accessory
+    if (Matter.isDeviceCommissioned()) 
+    {
+        Serial.println("Matter Node is commissioned and connected to the network. Ready for use.");
+        Serial.printf("Initial state: %s\r\n", OnOffPlugin.getOnOff() ? "ON" : "OFF");
+        OnOffPlugin.updateAccessory();  // configure the Plugin based on initial state
+    }
+
+    /** Start scanning for advertisers */ // move this to matter event handler?
     pScan->start(scanTimeMs);
 }
 
@@ -493,6 +526,8 @@ void loop()
         else
         {
             Serial.println("Failed to connect");
+            OnOffPlugin.setOnOff(false);
+            OnOffPlugin.updateAccessory();
 
             if (auto request = pressRequest.lock()) 
             {
@@ -505,4 +540,9 @@ void loop()
             }
         }
     }
+
+    // if (Matter.isDeviceCommissioned()) 
+    // {
+    //     Serial.printf("Initial state: %s\r\n", OnOffPlugin.getOnOff() ? "ON" : "OFF");
+    // }
 }
