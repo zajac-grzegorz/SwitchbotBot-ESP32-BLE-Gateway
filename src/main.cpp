@@ -2,19 +2,21 @@
 #include <M5AtomS3.h>
 #include <NimBLEDevice.h>
 #include <WiFi.h>
-#include <WebServer.h>
+#include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
 #include "ReBLEUtils.h"
 #include "ReBLEConfig.h"
 
 std::string botMacAddr = botMac;
 
-WebServer server(80);
+static AsyncWebServer server(webServerPort);
+static AsyncWebServerRequestPtr pressRequest;
 
 static const NimBLEAdvertisedDevice* advDevice = nullptr;
 static NimBLEScan* pScan = nullptr;
 
 static bool doConnect = false;
+static uint64_t conTimeout = 0;
 static uint32_t scanTimeMs = 5000; /** scan time in milliseconds, 0 = scan forever */
 
 static BLEUUID serviceUUID("cba20d00-224d-11e6-9fb8-0002a5d5c51b");
@@ -22,49 +24,19 @@ static BLEUUID controlCharacteristicUUID("cba20002-224d-11e6-9fb8-0002a5d5c51b")
 static BLEUUID notifyCharacteristicUUID("cba20003-224d-11e6-9fb8-0002a5d5c51b");
 static BLEUUID descriptorUUID("2902");
 
-/**  None of these are required as they will be handled by the library with defaults. **
- **                       Remove as you see fit for your needs                        */
 class ClientCallbacks : public NimBLEClientCallbacks
 {
     void onConnect(NimBLEClient *pClient) override
     {
-        Serial.printf("Connected\n");
+        conTimeout = millis();
     }
 
     void onDisconnect(NimBLEClient *pClient, int reason) override
     {
-        Serial.printf("%s Disconnected, reason = %d - Starting scan\n", pClient->getPeerAddress().toString().c_str(), reason);
-        // NimBLEDevice::getScan()->start(scanTimeMs, false, true);
-    }
+        uint64_t tm = millis() - conTimeout;
 
-    /********************* Security handled here *********************/
-    void onPassKeyEntry(NimBLEConnInfo &connInfo) override
-    {
-        Serial.printf("Server Passkey Entry\n");
-        /**
-         * This should prompt the user to enter the passkey displayed
-         * on the peer device.
-         */
-        NimBLEDevice::injectPassKey(connInfo, 123456);
-    }
-
-    void onConfirmPasskey(NimBLEConnInfo &connInfo, uint32_t pass_key) override
-    {
-        Serial.printf("The passkey YES/NO number: %" PRIu32 "\n", pass_key);
-        /** Inject false if passkeys don't match. */
-        NimBLEDevice::injectConfirmPasskey(connInfo, true);
-    }
-
-    /** Pairing process complete, we can check the results in connInfo */
-    void onAuthenticationComplete(NimBLEConnInfo &connInfo) override
-    {
-        if (!connInfo.isEncrypted())
-        {
-            Serial.printf("Encrypt connection failed - disconnecting\n");
-            /** Find the client with the connection handle provided in connInfo */
-            NimBLEDevice::getClientByHandle(connInfo.getConnHandle())->disconnect();
-            return;
-        }
+        Serial.printf("%s Disconnected, reason = %d, timeout = %lld\n", 
+            pClient->getPeerAddress().toString().c_str(), reason, tm);
     }
 } clientCallbacks;
 
@@ -73,6 +45,7 @@ class ScanCallbacks : public NimBLEScanCallbacks
 {
     void onResult(const NimBLEAdvertisedDevice *advertisedDevice) override
     {
+        // This is a device with our MAC address
         if (advertisedDevice->getAddress().toString() == botMacAddr)
         {
             Serial.printf("Advertised Device found: %s\n", advertisedDevice->getAddress().toString().c_str());
@@ -82,9 +55,7 @@ class ScanCallbacks : public NimBLEScanCallbacks
 
             /** Save the device reference in a global for the client to use*/
             advDevice = advertisedDevice;
-
-            /** Ready to connect now */
-            doConnect = true;
+            // doConnect = true;
         }
     }
 
@@ -110,12 +81,24 @@ void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData,
     str = "** Characteristic = " + pRemoteCharacteristic->getUUID().toString();
     Serial.printf("%s\n", str.c_str());
 
-    str = "*** Value = " + NimBLEUtils::dataToHexString(pData, length);
+    std::string resultData = NimBLEUtils::dataToHexString(pData, length);
+
+    str = "*** Value = " + resultData;
     Serial.printf("%s\n", str.c_str());
+
+    if (auto request = pressRequest.lock()) 
+    {
+        AsyncJsonResponse *response = new AsyncJsonResponse();
+        JsonObject root = response->getRoot().to<JsonObject>();
+        root["status"] = resultData.substr(0, 2);
+        root["payload"] = resultData.substr(2);
+        response->setLength();
+        request->send(response);
+    } 
 }
 
 /** Handles the provisioning of clients and connects / interfaces with the server */
-bool connectToServer()
+bool connectToSwitchBot()
 {
     NimBLEClient *pClient = nullptr;
 
@@ -131,12 +114,21 @@ bool connectToServer()
 
         if (pClient)
         {
-            if (!pClient->connect(advDevice, false))
+            if (pClient->isConnected())
             {
-                Serial.println("Reconnect failed");
-                return false;
+                Serial.println("Client exists and is already conected");
+                return true;
+            } 
+            else
+            {
+                if (!pClient->connect(advDevice, false))
+                {
+                    Serial.println("Reconnect failed");
+                    return false;
+                }
+
+                Serial.println("Reconnected client");
             }
-            Serial.println("Reconnected client");
         }
         else
         {
@@ -159,7 +151,7 @@ bool connectToServer()
 
         pClient = NimBLEDevice::createClient();
 
-        Serial.printf("New client created\n");
+        Serial.println("New client created");
 
         pClient->setClientCallbacks(&clientCallbacks, false);
         /**
@@ -177,6 +169,7 @@ bool connectToServer()
         {
             /** Created a client but failed to connect, don't need to keep it as it has no data */
             NimBLEDevice::deleteClient(pClient);
+
             Serial.println("Failed to connect, deleted client");
             return false;
         }
@@ -186,7 +179,7 @@ bool connectToServer()
     {
         if (!pClient->connect(advDevice))
         {
-            Serial.printf("Failed to connect\n");
+            Serial.println("Failed to connect");
             return false;
         }
     }
@@ -196,9 +189,7 @@ bool connectToServer()
     /** Now we can read/write/subscribe the characteristics of the services we are interested in */
     NimBLERemoteService *pSvc = nullptr;
     NimBLERemoteCharacteristic *pChr = nullptr;
-    NimBLERemoteDescriptor *pDsc = nullptr;
 
-    // pSvc = pClient->getService(serviceUUID);
     pSvc = pClient->getService(serviceUUID);
 
     if (pSvc)
@@ -211,12 +202,6 @@ bool connectToServer()
             if (pChr->canRead())
             {
                 Serial.printf("%s Value: %s\n", pChr->getUUID().toString().c_str(), pChr->readValue().c_str());
-            }
-
-            pDsc = pChr->getDescriptor(descriptorUUID);
-            if (pDsc)
-            {
-                Serial.printf("Descriptor: %s  Value: %s\n", pDsc->getUUID().toString().c_str(), pDsc->readValue().c_str());
             }
 
             if (pChr->canNotify())
@@ -247,6 +232,43 @@ bool connectToServer()
         Serial.println("SwitchBot Bot service not found");
     }
 
+    Serial.println("Connected, subscribed to notifications and waiting for a command...");
+
+    // bool retVal = executeSwitchBotCommand("570100");
+    
+    return true;
+}
+
+bool executeSwitchBotCommand(std::string cmd)
+{
+    // Establish connection with the client
+    if (!connectToSwitchBot())
+    {
+        Serial.println("executeSwitchBotCommand: Client not created");
+        return false;
+    }
+
+    NimBLEClient* pClient = NimBLEDevice::getClientByPeerAddress(advDevice->getAddress());
+    
+    if (!pClient)
+    {
+        Serial.println("executeSwitchBotCommand: Client not exists");
+        return false;
+    }
+    else
+    {
+        if (!pClient->isConnected())
+        {
+            Serial.println("executeSwitchBotCommand: Client not connected");
+            return false;
+        }
+    }
+
+    NimBLERemoteService *pSvc = nullptr;
+    NimBLERemoteCharacteristic *pChr = nullptr;
+
+    pSvc = pClient->getService(serviceUUID);
+
     if (pSvc)
     {
         // Type: write, write without response
@@ -262,11 +284,9 @@ bool connectToServer()
             if (pChr->canWrite())
             {
                 // std::vector<uint8_t> vPress { 0x57, 0x01, 0x00 };
-                std::vector<uint8_t> vPress = stringToHexArray("570100");
+                std::vector<uint8_t> vPress = stringToHexArray(cmd);
                 Serial.printf("Command data: %s\n", NimBLEUtils::dataToHexString(vPress.data(), vPress.size()).c_str());
-                // byte bArrayPress[] = {0x57, 0x01, 0x00};
 
-                // if (pChr->writeValue(bArrayPress, 3, true))
                 if (pChr->writeValue(vPress, true))
                 {
                     Serial.printf("Wrote new value to: %s\n", pChr->getUUID().toString().c_str());
@@ -289,44 +309,41 @@ bool connectToServer()
         Serial.println("Switchbot Bot service not found.");
     }
 
-    Serial.println("Done with this device!");
-    
     return true;
 }
 
-void handleRoot() 
+void handleRoot(AsyncWebServerRequest *request) 
 {
-    server.send(200, "text/plain", "ESP32 to Switchbot Bot gateway");
+    request->send(200, "text/plain", "ESP32 to Switchbot Bot gateway");
 }
 
-void handleNotFound()
+void handleNotFound(AsyncWebServerRequest *request)
 {
-    String message = "File Not Found\n\n";
+    String message = "Invalid Url\n\n";
     message += "URI: ";
-    message += server.uri();
+    message += request->url();
     message += "\nMethod: ";
-    message += (server.method() == HTTP_GET) ? "GET" : "POST";
+    message += (request->method() == HTTP_GET) ? "GET" : "POST";
     message += "\nArguments: ";
-    message += server.args();
+    message += request->args();
     message += "\n";
-    for (uint8_t i = 0; i < server.args(); i++)
+    for (uint8_t i = 0; i < request->args(); i++)
     {
-        message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+        message += " " + request->argName(i) + ": " + request->arg(i) + "\n";
     }
-    server.send(404, "text/plain", message);
+    request->send(404, "text/plain", message);
 }
 
 void setup()
 {
     Serial.begin(115200);
-    // delay(3000);
 
     AtomS3.begin(true);
     AtomS3.dis.setBrightness(50);
     AtomS3.dis.drawpix(0x00DD00);
     AtomS3.update();
 
-    Serial.printf("Starting NimBLE Client\n");
+    Serial.println("Starting NimBLE Client");
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, pass);
@@ -351,53 +368,65 @@ void setup()
 
     server.on("/", handleRoot);
 
-    server.on("/start", []()
+    server.on("/heap", HTTP_GET, [](AsyncWebServerRequest *request)
     {
-        /** Start scanning for advertisers */
-        pScan->start(scanTimeMs);
-
-        Serial.printf("Scanning for peripherals\n");
-        server.send(200, "text/plain", "Scanning started"); 
+        AsyncJsonResponse *response = new AsyncJsonResponse();
+        JsonObject root = response->getRoot().to<JsonObject>();
+        root["Heap_size"] = ESP.getHeapSize();
+        root["Free_heap"] = ESP.getFreeHeap();
+        root["Min_Free_Heap"] = ESP.getMinFreeHeap();
+        root["Max_Alloc_Heap"] = ESP.getMaxAllocHeap();
+        response->setLength();
+        request->send(response);
     });
 
-    server.on("/open", []()
+    server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request)
     {
-        if (advDevice && !doConnect)
+        Serial.printf("Heap Size: %ld\n", ESP.getHeapSize());
+        Serial.printf("Free Heap: %ld\n", ESP.getFreeHeap());
+        Serial.printf("Min Free Heap: %ld\n", ESP.getMinFreeHeap());
+        Serial.printf("Max Alloc Heap: %ld\n", ESP.getMaxAllocHeap());
+
+        request->send(200, "text/plain", "Device has been restarted");
+        ESP.restart();
+    });
+
+    server.on("/switchbot/press", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        if (advDevice)
         {
             doConnect = true;
+            pressRequest = request->pause();
         }
-
-        server.send(200, "text/plain", "Open init"); 
+        else
+        {
+            request->send(200, "text/plain", "Device is not connected, command NOT executed...");
+        }
     });
+
+    server.on("/switchbot/command", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        String code;
+
+        if (request->hasParam("cmd"))
+        {
+            code = request->getParam("cmd")->value();
+        }
+        
+        request->send(200, "text/plain", code);
+    });
+
 
     server.onNotFound(handleNotFound);
     server.begin();
 
-    Serial.println("HTTP server started");
+    Serial.println("Async Web Server started");
 
     /** Initialize NimBLE and set the device name */
     NimBLEDevice::init("SwitchBot-Bot-Client");
-
     NimBLEDevice::whiteListAdd(NimBLEAddress(botMacAddr, 0));
-    /**
-     * Set the IO capabilities of the device, each option will trigger a different pairing method.
-     *  BLE_HS_IO_KEYBOARD_ONLY   - Passkey pairing
-     *  BLE_HS_IO_DISPLAY_YESNO   - Numeric comparison pairing
-     *  BLE_HS_IO_NO_INPUT_OUTPUT - DEFAULT setting - just works pairing
-     */
-    // NimBLEDevice::setSecurityIOCap(BLE_HS_IO_KEYBOARD_ONLY); // use passkey
-    // NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_YESNO); //use numeric comparison
+    NimBLEDevice::setPower(ESP_PWR_LVL_P9); /** +9dbm */
 
-    /**
-     * 2 different ways to set security - both calls achieve the same result.
-     *  no bonding, no man in the middle protection, BLE secure connections.
-     *  These are the default values, only shown here for demonstration.
-     */
-    // NimBLEDevice::setSecurityAuth(false, false, true);
-    // NimBLEDevice::setSecurityAuth(BLE_SM_PAIR_AUTHREQ_BOND | BLE_SM_PAIR_AUTHREQ_MITM | BLE_SM_PAIR_AUTHREQ_SC);
-
-    /** Optional: set the transmit power */
-    NimBLEDevice::setPower(ESP_PWR_LVL_P9); /** 3dbm */
     pScan = NimBLEDevice::getScan();
 
     /** Set the callbacks to call when scan events occur, no duplicates */
@@ -413,28 +442,38 @@ void setup()
      */
     // Do not need active scan, only mac address is important during advertisment process
     // pScan->setActiveScan(true);
+
+    /** Start scanning for advertisers */
+    pScan->start(scanTimeMs);
 }
 
 void loop()
 {
     /** Loop here until we find a device we want to connect to */
-    delay(10);
+    // delay(10);
 
     if (doConnect)
     {
         doConnect = false;
         /** Found a device we want to connect to, do it now */
-        if (connectToServer())
+        // if (connectToSwitchBot())
+        if (executeSwitchBotCommand("570100"))
         {
-            Serial.printf("Success! we should now be getting notifications, scanning for more!\n");
+            Serial.println("Success! we should now be getting notifications");
         }
         else
         {
-            Serial.printf("Failed to connect, starting scan\n");
+            Serial.println("Failed to connect");
+
+            if (auto request = pressRequest.lock()) 
+            {
+                AsyncJsonResponse *response = new AsyncJsonResponse();
+                JsonObject root = response->getRoot().to<JsonObject>();
+                root["status"] = "ER";
+                root["payload"] = "Error with connection to Switchbot";
+                response->setLength();
+                request->send(response);
+            }
         }
-
-        // NimBLEDevice::getScan()->start(scanTimeMs, false, true);
     }
-
-    server.handleClient();
 }
