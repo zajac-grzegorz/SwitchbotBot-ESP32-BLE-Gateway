@@ -16,6 +16,7 @@ static const NimBLEAdvertisedDevice* advDevice = nullptr;
 static NimBLEScan* pScan = nullptr;
 
 static bool doConnect = false;
+static std::string doCommand = "570100"; // default is press command
 static uint64_t conTimeout = 0;
 static uint32_t scanTimeMs = 5000; /** scan time in milliseconds, 0 = scan forever */
 
@@ -287,6 +288,13 @@ bool executeSwitchBotCommand(std::string cmd)
                 std::vector<uint8_t> vPress = stringToHexArray(cmd);
                 Serial.printf("Command data: %s\n", NimBLEUtils::dataToHexString(vPress.data(), vPress.size()).c_str());
 
+                // All command for Bot must start with 0x57 byte
+                if (vPress.at(0) != 0x57)
+                {
+                    Serial.println("Write failed - command must start with 0x57 byte");
+                    return false;
+                }
+
                 if (pChr->writeValue(vPress, true))
                 {
                     Serial.printf("Wrote new value to: %s\n", pChr->getUUID().toString().c_str());
@@ -382,17 +390,14 @@ void setup()
 
     server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request)
     {
-        Serial.printf("Heap Size: %ld\n", ESP.getHeapSize());
-        Serial.printf("Free Heap: %ld\n", ESP.getFreeHeap());
-        Serial.printf("Min Free Heap: %ld\n", ESP.getMinFreeHeap());
-        Serial.printf("Max Alloc Heap: %ld\n", ESP.getMaxAllocHeap());
-
         request->send(200, "text/plain", "Device has been restarted");
         ESP.restart();
     });
 
     server.on("/switchbot/press", HTTP_GET, [](AsyncWebServerRequest *request)
     {
+        doCommand = "570100";
+
         if (advDevice)
         {
             doConnect = true;
@@ -408,12 +413,25 @@ void setup()
     {
         String code;
 
-        if (request->hasParam("cmd"))
+        if (request->hasParam("cmd") && !request->getParam("cmd")->value().isEmpty())
         {
             code = request->getParam("cmd")->value();
+            doCommand = code.c_str();
+
+            if (advDevice)
+            {
+                doConnect = true;
+                pressRequest = request->pause();
+            }
+            else
+            {
+                request->send(200, "text/plain", "Device is not connected, command NOT executed...");
+            }
         }
-        
-        request->send(200, "text/plain", code);
+        else
+        {
+            request->send(200, "text/plain", "Missing parameter");
+        }
     });
 
 
@@ -457,7 +475,7 @@ void loop()
         doConnect = false;
         /** Found a device we want to connect to, do it now */
         // if (connectToSwitchBot())
-        if (executeSwitchBotCommand("570100"))
+        if (executeSwitchBotCommand(doCommand))
         {
             Serial.println("Success! we should now be getting notifications");
         }
