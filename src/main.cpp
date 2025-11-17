@@ -23,13 +23,16 @@ static uint32_t scanTimeMs = 5000; /** scan time in milliseconds, 0 = scan forev
 static BLEUUID serviceUUID("cba20d00-224d-11e6-9fb8-0002a5d5c51b");
 static BLEUUID controlCharacteristicUUID("cba20002-224d-11e6-9fb8-0002a5d5c51b");
 static BLEUUID notifyCharacteristicUUID("cba20003-224d-11e6-9fb8-0002a5d5c51b");
-static BLEUUID descriptorUUID("2902");
+
+void ledOn(CRGB color, uint8_t brightness, bool init=false);
 
 class ClientCallbacks : public NimBLEClientCallbacks
 {
     void onConnect(NimBLEClient *pClient) override
     {
         conTimeout = millis();
+
+        ledOn(0xDD0000, 50);
     }
 
     void onDisconnect(NimBLEClient *pClient, int reason) override
@@ -38,6 +41,8 @@ class ClientCallbacks : public NimBLEClientCallbacks
 
         Serial.printf("%s Disconnected, reason = %d, timeout = %lld\n", 
             pClient->getPeerAddress().toString().c_str(), reason, tm);
+        
+        ledOn(0x00DD00, 50);
     }
 } clientCallbacks;
 
@@ -235,8 +240,6 @@ bool connectToSwitchBot()
 
     Serial.println("Connected, subscribed to notifications and waiting for a command...");
 
-    // bool retVal = executeSwitchBotCommand("570100");
-    
     return true;
 }
 
@@ -284,7 +287,6 @@ bool executeSwitchBotCommand(std::string cmd)
 
             if (pChr->canWrite())
             {
-                // std::vector<uint8_t> vPress { 0x57, 0x01, 0x00 };
                 std::vector<uint8_t> vPress = stringToHexArray(cmd);
                 Serial.printf("Command data: %s\n", NimBLEUtils::dataToHexString(vPress.data(), vPress.size()).c_str());
 
@@ -342,14 +344,23 @@ void handleNotFound(AsyncWebServerRequest *request)
     request->send(404, "text/plain", message);
 }
 
+void ledOn(CRGB color, uint8_t brightness, bool init)
+{
+    if (init)
+    {
+        AtomS3.begin(init);
+    }
+
+    AtomS3.dis.setBrightness(brightness);
+    AtomS3.dis.drawpix(color);
+    AtomS3.update();
+}
+
 void setup()
 {
     Serial.begin(115200);
 
-    AtomS3.begin(true);
-    AtomS3.dis.setBrightness(50);
-    AtomS3.dis.drawpix(0x00DD00);
-    AtomS3.update();
+    ledOn(0x0000DD, 50, true);
 
     Serial.println("Starting NimBLE Client");
 
