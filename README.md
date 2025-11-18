@@ -6,8 +6,12 @@ BLE gateway to control Switchbot Bot device with ESP32, either over Matter or th
   
 * Access through the built-in async web server (uses request continuation feature):
   
-  * http://<ip_of_the_device>/switchbot/press - to execute single press command
-  * http://<ip_of_the_device>/switchbot/command?cmd=570200 - to i.e. get Bot status like battery level (commands need to be in hex)
+  * execute single press command
+    - http://<ip_of_the_device>/switchbot/press
+      
+  * get Bot status like battery level (commands need to be in hex, 0x570200)
+    -  http://<ip_of_the_device>/switchbot/command?cmd=570200
+      
   * result of any API call is returned to the browser in the JSON format, i.e. { "status": "01", "payload": ff00 }
 
 Valid commands and Switchbot Bot API is available here: 
