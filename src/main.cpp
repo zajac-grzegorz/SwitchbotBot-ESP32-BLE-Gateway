@@ -3,6 +3,8 @@
 #include <NimBLEDevice.h>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
+#include <MycilaSystem.h>
+#include <MycilaESPConnect.h>
 #include <ESPmDNS.h>
 #include "ReBLEUtils.h"
 #include "ReBLEConfig.h"
@@ -13,6 +15,7 @@ MatterOnOffPlugin OnOffPlugin;
 std::string botMacAddr = botMac;
 
 static AsyncWebServer server(webServerPort);
+static Mycila::ESPConnect espConnect(server);
 static AsyncWebServerRequestPtr pressRequest;
 
 static const NimBLEAdvertisedDevice* advDevice = nullptr;
@@ -419,10 +422,30 @@ void setup()
         request->send(response);
     });
 
-    server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request)
+    server.on("/admin/restart", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         request->send(200, "text/plain", "Device has been restarted");
         ESP.restart();
+    });
+
+    server.on("/admin/decomission", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        Serial.println("Decommissioning the Plugin Matter Accessory. It shall be commissioned again");
+        OnOffPlugin.setOnOff(false);
+        Matter.decommission();
+
+        request->send(200, "text/plain", "Decommissioning the Matter Accessory. It shall be commissioned again");
+    });
+
+    server.on("/admin", HTTP_GET, [](AsyncWebServerRequest* request) 
+    {
+        request->send(200, "text/html", "<form method='POST' action='/admin/safeboot' enctype='multipart/form-data'><input type='submit' value='Restart in SafeBoot mode'></form>");
+    });
+
+    server.on("/admin/safeboot", HTTP_POST, [](AsyncWebServerRequest *request)
+    {
+        request->send(200, "text/plain", "Restarting in SafeBoot mode...");
+        Mycila::System::restartFactory("safeboot", 250);
     });
 
     server.on("/switchbot/press", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -500,9 +523,13 @@ void setup()
     // This may be a restart of a already commissioned Matter accessory
     if (Matter.isDeviceCommissioned()) 
     {
-        Serial.println("Matter Node is commissioned and connected to the network. Ready for use.");
+        Serial.println("Matter Node is commissioned and connected to the network. Ready for use");
         Serial.printf("Initial state: %s\r\n", OnOffPlugin.getOnOff() ? "ON" : "OFF");
         OnOffPlugin.updateAccessory();  // configure the Plugin based on initial state
+    }
+    else
+    {
+        Serial.printf("Matter comission code is: %s\n", Matter.getManualPairingCode().c_str());
     }
 
     /** Start scanning for advertisers */ // move this to matter event handler?
@@ -511,9 +538,6 @@ void setup()
 
 void loop()
 {
-    /** Loop here until we find a device we want to connect to */
-    // delay(10);
-
     if (doConnect)
     {
         doConnect = false;
@@ -540,9 +564,4 @@ void loop()
             }
         }
     }
-
-    // if (Matter.isDeviceCommissioned()) 
-    // {
-    //     Serial.printf("Initial state: %s\r\n", OnOffPlugin.getOnOff() ? "ON" : "OFF");
-    // }
 }
