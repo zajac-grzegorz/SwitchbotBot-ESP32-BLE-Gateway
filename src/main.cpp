@@ -16,6 +16,7 @@ std::string botMacAddr = botMac;
 
 static AsyncWebServer server(webServerPort);
 static Mycila::ESPConnect espConnect(server);
+// static Mycila::ESPConnect espConnect;
 static AsyncWebServerRequestPtr pressRequest;
 
 static const NimBLEAdvertisedDevice* advDevice = nullptr;
@@ -385,30 +386,66 @@ void setup()
 
     ledOn(0x0000DD, 50, true);
 
+    // Mycila::ESPConnect::Config config;
+    // config.hostname = "BLE Gateway";
+    // config.wifiSSID = ssid;
+    // config.wifiPassword = pass;
+    // espConnect.saveConfiguration(config);
+
     Serial.println("Starting NimBLE Client");
 
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid, pass);
-    Serial.println("");
-
-    while (WiFi.status() != WL_CONNECTED)
+    // network state listener
+    espConnect.listen([](__unused Mycila::ESPConnect::State previous, __unused Mycila::ESPConnect::State state) 
     {
-        delay(500);
-        Serial.print(".");
-    }
+        JsonDocument doc;
+        espConnect.toJson(doc.to<JsonObject>());
+        serializeJsonPretty(doc, Serial);
+        Serial.println();
+    });
 
-    Serial.println("");
-    Serial.print("Connected to: ");
-    Serial.println(ssid);
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
+    espConnect.setAutoRestart(true);
+    espConnect.setBlocking(true);
+    Serial.println("Trying to connect to saved WiFi or will start portal...");
+    espConnect.begin("BLE Gateway", "BLEGateway");
+    Serial.println("ESPConnect completed, continuing setup()...");
 
-    if (MDNS.begin("esp32-switchbot"))
-    {
-        Serial.println("MDNS responder started");
-    }
+    // serve your home page here
+    server.on("/", handleRoot).setFilter([](__unused AsyncWebServerRequest* request) 
+    { 
+        return espConnect.getState() != Mycila::ESPConnect::State::PORTAL_STARTED; 
+    });
+    
+    
+    // WiFi.mode(WIFI_STA);
+    // WiFi.begin(ssid, pass);
+    // Serial.println("");
+
+    // while (WiFi.status() != WL_CONNECTED)
+    // {
+    //     delay(500);
+    //     Serial.print(".");
+    // }
+
+    // Serial.println("");
+    // Serial.print("Connected to: ");
+    // Serial.println(ssid);
+    // Serial.print("IP address: ");
+    // Serial.println(WiFi.localIP());
+
+    // if (MDNS.begin("esp32-switchbot"))
+    // {
+    //     Serial.println("MDNS responder started");
+    // }
 
     server.on("/", handleRoot);
+
+    // clear persisted config
+    server.on("/admin/clear", HTTP_GET, [&](AsyncWebServerRequest* request) 
+    {
+        espConnect.clearConfiguration();
+        request->send(200);
+        ESP.restart();
+    });
 
     server.on("/heap", HTTP_GET, [](AsyncWebServerRequest *request)
     {
@@ -538,6 +575,8 @@ void setup()
 
 void loop()
 {
+    espConnect.loop();
+    
     if (doConnect)
     {
         doConnect = false;
