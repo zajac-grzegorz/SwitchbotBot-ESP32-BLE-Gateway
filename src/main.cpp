@@ -3,7 +3,6 @@
 #include <NimBLEDevice.h>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
-#include <MycilaSystem.h>
 #include <MycilaESPConnect.h>
 #include <ESPmDNS.h>
 #include "ReBLEUtils.h"
@@ -472,17 +471,6 @@ void setup()
         Matter.decommission();
 
         request->send(200, "text/plain", "Decommissioning the Matter Accessory. It shall be commissioned again");
-    });
-
-    server.on("/admin", HTTP_GET, [](AsyncWebServerRequest* request) 
-    {
-        request->send(200, "text/html", "<form method='POST' action='/admin/safeboot' enctype='multipart/form-data'><input type='submit' value='Restart in SafeBoot mode'></form>");
-    });
-
-    server.on("/admin/safeboot", HTTP_POST, [](AsyncWebServerRequest *request)
-    {
-        request->send(200, "text/plain", "Restarting in SafeBoot mode...");
-        Mycila::System::restartFactory("safeboot", 250);
     });
 
     server.on("/switchbot/press", HTTP_GET, [](AsyncWebServerRequest *request)
