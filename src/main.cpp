@@ -100,12 +100,13 @@ void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData,
 
     if (auto request = pressRequest.lock()) 
     {
-        AsyncJsonResponse *response = new AsyncJsonResponse();
-        JsonObject root = response->getRoot().to<JsonObject>();
-        root["status"] = resultData.substr(0, 2);
-        root["payload"] = resultData.substr(2);
-        response->setLength();
-        request->send(response);
+        JsonDocument doc;
+        doc["status"] = resultData.substr(0, 2);
+        doc["payload"] = resultData.substr(2);
+        
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
     } 
 
     OnOffPlugin.setOnOff(false);
@@ -425,14 +426,15 @@ void setup()
 
     server.on("/heap", HTTP_GET, [](AsyncWebServerRequest *request)
     {
-        AsyncJsonResponse *response = new AsyncJsonResponse();
-        JsonObject root = response->getRoot().to<JsonObject>();
-        root["Heap_size"] = ESP.getHeapSize();
-        root["Free_heap"] = ESP.getFreeHeap();
-        root["Min_Free_Heap"] = ESP.getMinFreeHeap();
-        root["Max_Alloc_Heap"] = ESP.getMaxAllocHeap();
-        response->setLength();
-        request->send(response);
+        JsonDocument doc;
+        doc["Heap_size"] = ESP.getHeapSize();
+        doc["Free_heap"] = ESP.getFreeHeap();
+        doc["Min_Free_Heap"] = ESP.getMinFreeHeap();
+        doc["Max_Alloc_Heap"] = ESP.getMaxAllocHeap();
+        
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
     });
 
     server.on("/admin/restart", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -462,6 +464,21 @@ void setup()
     });
 
     server.on("/switchbot/press", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        doCommand = "570100";
+
+        if (advDevice)
+        {
+            doConnect = true;
+            pressRequest = request->pause();
+        }
+        else
+        {
+            request->send(200, "text/plain", "Device is not connected, command NOT executed...");
+        }
+    });
+
+    server.on("/switchbot/press", HTTP_POST, [](AsyncWebServerRequest *request)
     {
         doCommand = "570100";
 
@@ -570,12 +587,13 @@ void loop()
 
             if (auto request = pressRequest.lock()) 
             {
-                AsyncJsonResponse *response = new AsyncJsonResponse();
-                JsonObject root = response->getRoot().to<JsonObject>();
-                root["status"] = "ER";
-                root["payload"] = "Error with connection to Switchbot";
-                response->setLength();
-                request->send(response);
+                JsonDocument doc;
+                doc["status"] = "ER";
+                doc["payload"] = "Error with connection to Switchbot";
+                
+                String output;
+                serializeJson(doc, output);
+                request->send(200, "application/json", output);
             }
         }
     }
