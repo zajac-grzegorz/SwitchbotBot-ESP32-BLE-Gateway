@@ -8,6 +8,7 @@
 #include "ReBLEUtils.h"
 #include "ReBLEConfig.h"
 #include <Matter.h>
+#include <MycilaSystem.h>
 
 MatterOnOffPlugin OnOffPlugin;
 
@@ -440,6 +441,17 @@ void setup()
         ESP.restart();
     });
 
+    server.on("/admin/safeboot", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(200, "text/html", "<form method='POST' action='/admin/safeboot' enctype='multipart/form-data'><input type='submit' value='Restart in SafeBoot mode'></form>");
+    });
+
+    server.on("/admin/safeboot", HTTP_POST, [](AsyncWebServerRequest *request)
+    {
+        request->send(200, "text/plain", "Restarting in SafeBoot mode...");
+        Mycila::System::restartFactory("safeboot", 1000);
+    });
+
     server.on("/admin/decomission", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         Serial.println("Decommissioning the Plugin Matter Accessory. It shall be commissioned again");
@@ -480,7 +492,7 @@ void setup()
             }
             else
             {
-                request->send(200, "text/plain", "Device is not connected, command NOT executed...");
+                request->send(200, "text/plain", "Device is not connected, command NOT executed");
             }
         }
         else
