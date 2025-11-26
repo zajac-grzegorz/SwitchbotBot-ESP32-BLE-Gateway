@@ -9,6 +9,7 @@
 #include "ReBLEConfig.h"
 #include <Matter.h>
 #include <MycilaSystem.h>
+#include <MycilaTaskManager.h>
 
 MatterOnOffPlugin OnOffPlugin;
 
@@ -31,6 +32,13 @@ static BLEUUID controlCharacteristicUUID("cba20002-224d-11e6-9fb8-0002a5d5c51b")
 static BLEUUID notifyCharacteristicUUID("cba20003-224d-11e6-9fb8-0002a5d5c51b");
 
 void ledOn(CRGB color, uint8_t brightness, bool init=false);
+
+Mycila::Task offMatterSwitchTask("Turn Off", [](void* params){
+    Serial.println("-> OFF Switch to false");
+
+    OnOffPlugin.setOnOff(false);
+    OnOffPlugin.updateAccessory();
+});
 
 class ClientCallbacks : public NimBLEClientCallbacks
 {
@@ -109,8 +117,10 @@ void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData,
         request->send(200, "application/json", output);
     } 
 
-    OnOffPlugin.setOnOff(false);
-    OnOffPlugin.updateAccessory();
+    // OnOffPlugin.setOnOff(false);
+    // OnOffPlugin.updateAccessory();
+
+    offMatterSwitchTask.resume(10000);
 }
 
 /** Handles the provisioning of clients and connects / interfaces with the server */
@@ -388,6 +398,13 @@ void setup()
 
     Serial.println("Starting BLE and Matter ESP32 Gateway to Switchbot Bot");
 
+    offMatterSwitchTask.setEnabled(true);
+    offMatterSwitchTask.setType(Mycila::Task::Type::ONCE);
+
+    offMatterSwitchTask.onDone([](const Mycila::Task& me, uint32_t elapsed) {
+        Serial.printf("Task '%s' executed in %ld us\n", me.name(), elapsed);
+    });
+
     // network state listener
     espConnect.listen([](__unused Mycila::ESPConnect::State previous, __unused Mycila::ESPConnect::State state) 
     {
@@ -569,6 +586,7 @@ void setup()
 void loop()
 {
     espConnect.loop();
+    offMatterSwitchTask.tryRun();
     
     if (doConnect)
     {
@@ -582,8 +600,10 @@ void loop()
         else
         {
             Serial.println("Failed to connect");
-            OnOffPlugin.setOnOff(false);
-            OnOffPlugin.updateAccessory();
+
+            offMatterSwitchTask.resume(10000);
+            // OnOffPlugin.setOnOff(false);
+            // OnOffPlugin.updateAccessory();
 
             if (auto request = pressRequest.lock()) 
             {
