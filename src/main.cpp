@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include <M5AtomS3.h>
 #include <NimBLEDevice.h>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
@@ -10,6 +9,50 @@
 #include <Matter.h>
 #include <MycilaSystem.h>
 #include <MycilaTaskManager.h>
+
+#include "extras/Blinker.h"
+#include "extras/Pixel.h"
+
+#define     LED_WIFI_NEEDED       300,0.5,1,2700      // slow single-blink
+#define     LED_PAIRING_NEEDED    300,0.5,2,2400      // slow double-blink
+#define     LED_ALERT             100                 // rapid flashing
+#define     LED_WIFI_CONNECTING   2000                // slow flashing
+#define     LED_AP_STARTED        100,0.5,2,300       // rapid double-blink
+#define     LED_AP_CONNECTED      300,0.5,2,400       // medium double-blink    
+#define     LED_OTA_STARTED       300,0.5,3,400       // medium triple-blink
+#define     LED_WIFI_SCANNING     300,0.8,3,400       // medium inverted triple-blink
+
+#define     LED_COLOR_RED   100,0,0
+#define     LED_COLOR_GREEN 0,100,0
+#define     LED_COLOR_BLUE  0,0,100
+
+Blinker *statusLED;                               // indicates status
+Blinkable *statusDevice = NULL;                   // the device used for the Blinker
+uint16_t autoOffLED = 0;
+uint8_t ledPin = PIN_RGB_LED;
+
+#define LED_STATUS_UPDATE(LED_UPDATE) {statusLED->LED_UPDATE;}
+#define LED_COLOR_UPDATE(RGB_COLOR) { \
+    if (statusDevice->isRGB) \
+    { \
+        ((Pixel*) statusDevice)->setOnColor(Pixel::RGB(RGB_COLOR)); \
+        statusLED->refresh(); \
+    } \
+}
+
+// sets Status Device to a simple LED on specified pin
+void setStatusPin(uint8_t pin)
+{
+    statusDevice = new GenericLED(pin);
+    statusDevice->isRGB = false;
+}
+
+// sets Status Device to an RGB Pixel on specified pin
+void setStatusPixel(uint8_t pin, float h=0, float s=100, float v=100)
+{
+    statusDevice = ((new Pixel(pin))->setOnColor(Pixel::HSV(h,s,v)));
+    statusDevice->isRGB = true;
+}
 
 MatterOnOffPlugin OnOffPlugin;
 
@@ -31,13 +74,15 @@ static BLEUUID serviceUUID("cba20d00-224d-11e6-9fb8-0002a5d5c51b");
 static BLEUUID controlCharacteristicUUID("cba20002-224d-11e6-9fb8-0002a5d5c51b");
 static BLEUUID notifyCharacteristicUUID("cba20003-224d-11e6-9fb8-0002a5d5c51b");
 
-void ledOn(CRGB color, uint8_t brightness, bool init=false);
 
 Mycila::Task offMatterSwitchTask("Turn Off", [](void* params){
     Serial.println("-> OFF Switch to false");
 
     OnOffPlugin.setOnOff(false);
     OnOffPlugin.updateAccessory();
+
+    LED_COLOR_UPDATE(LED_COLOR_GREEN);
+    statusLED->on();
 });
 
 class ClientCallbacks : public NimBLEClientCallbacks
@@ -46,7 +91,8 @@ class ClientCallbacks : public NimBLEClientCallbacks
     {
         conTimeout = millis();
 
-        ledOn(0xDD0000, 50);
+        LED_COLOR_UPDATE(LED_COLOR_RED);
+        LED_STATUS_UPDATE(start(LED_AP_CONNECTED));
     }
 
     void onDisconnect(NimBLEClient *pClient, int reason) override
@@ -56,7 +102,8 @@ class ClientCallbacks : public NimBLEClientCallbacks
         Serial.printf("%s Disconnected, reason = %d, timeout = %lld\n", 
             pClient->getPeerAddress().toString().c_str(), reason, tm);
         
-        ledOn(0x00DD00, 50);
+        LED_COLOR_UPDATE(LED_COLOR_BLUE);
+        statusLED->on();
     }
 } clientCallbacks;
 
@@ -364,18 +411,6 @@ void handleNotFound(AsyncWebServerRequest *request)
     request->send(404, "text/plain", message);
 }
 
-void ledOn(CRGB color, uint8_t brightness, bool init)
-{
-    if (init)
-    {
-        AtomS3.begin(init);
-    }
-
-    AtomS3.dis.setBrightness(brightness);
-    AtomS3.dis.drawpix(color);
-    AtomS3.update();
-}
-
 // Matter Protocol Endpoint Callback
 bool setPluginOnOff(bool state) {
     Serial.printf("User Callback :: New Plugin State = %s\r\n", state ? "ON" : "OFF");
@@ -393,8 +428,12 @@ bool setPluginOnOff(bool state) {
 void setup()
 {
     Serial.begin(115200);
-
-    ledOn(0x0000DD, 50, true);
+    setStatusPixel(ledPin, 240.0, 100.0, 40.0);
+    // homeSpan.setControlPin(41, PushButton::TRIGGER_ON_LOW);
+    // create Status LED, even is statusDevice is NULL
+    statusLED = new Blinker(statusDevice, autoOffLED);
+    // LED_STATUS_UPDATE(start(LED_WIFI_NEEDED));
+    statusLED->on();
 
     Serial.println("Starting BLE and Matter ESP32 Gateway to Switchbot Bot");
 
@@ -426,11 +465,6 @@ void setup()
         return espConnect.getState() != Mycila::ESPConnect::State::PORTAL_STARTED; 
     });
     
-    // if (MDNS.begin("esp32-switchbot"))
-    // {
-    //     Serial.println("MDNS responder started");
-    // }
-
     server.on("/", handleRoot);
 
     // clear persisted config
