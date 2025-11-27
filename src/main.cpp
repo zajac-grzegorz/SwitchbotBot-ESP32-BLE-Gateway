@@ -6,53 +6,10 @@
 #include <ESPmDNS.h>
 #include "ReBLEUtils.h"
 #include "ReBLEConfig.h"
+#include "ReLED.h"
 #include <Matter.h>
 #include <MycilaSystem.h>
 #include <MycilaTaskManager.h>
-
-#include "extras/Blinker.h"
-#include "extras/Pixel.h"
-
-#define     LED_WIFI_NEEDED       300,0.5,1,2700      // slow single-blink
-#define     LED_PAIRING_NEEDED    300,0.5,2,2400      // slow double-blink
-#define     LED_ALERT             100                 // rapid flashing
-#define     LED_WIFI_CONNECTING   2000                // slow flashing
-#define     LED_AP_STARTED        100,0.5,2,300       // rapid double-blink
-#define     LED_AP_CONNECTED      300,0.5,2,400       // medium double-blink    
-#define     LED_OTA_STARTED       300,0.5,3,400       // medium triple-blink
-#define     LED_WIFI_SCANNING     300,0.8,3,400       // medium inverted triple-blink
-
-#define     LED_COLOR_RED   100,0,0
-#define     LED_COLOR_GREEN 0,100,0
-#define     LED_COLOR_BLUE  0,0,100
-
-Blinker *statusLED;                               // indicates status
-Blinkable *statusDevice = NULL;                   // the device used for the Blinker
-uint16_t autoOffLED = 0;
-uint8_t ledPin = PIN_RGB_LED;
-
-#define LED_STATUS_UPDATE(LED_UPDATE) {statusLED->LED_UPDATE;}
-#define LED_COLOR_UPDATE(RGB_COLOR) { \
-    if (statusDevice->isRGB) \
-    { \
-        ((Pixel*) statusDevice)->setOnColor(Pixel::RGB(RGB_COLOR)); \
-        statusLED->refresh(); \
-    } \
-}
-
-// sets Status Device to a simple LED on specified pin
-void setStatusPin(uint8_t pin)
-{
-    statusDevice = new GenericLED(pin);
-    statusDevice->isRGB = false;
-}
-
-// sets Status Device to an RGB Pixel on specified pin
-void setStatusPixel(uint8_t pin, float h=0, float s=100, float v=100)
-{
-    statusDevice = ((new Pixel(pin))->setOnColor(Pixel::HSV(h,s,v)));
-    statusDevice->isRGB = true;
-}
 
 MatterOnOffPlugin OnOffPlugin;
 
@@ -82,7 +39,7 @@ Mycila::Task offMatterSwitchTask("Turn Off", [](void* params){
     OnOffPlugin.updateAccessory();
 
     LED_COLOR_UPDATE(LED_COLOR_GREEN);
-    statusLED->on();
+    LED_STATUS_UPDATE(on());
 });
 
 class ClientCallbacks : public NimBLEClientCallbacks
@@ -103,7 +60,7 @@ class ClientCallbacks : public NimBLEClientCallbacks
             pClient->getPeerAddress().toString().c_str(), reason, tm);
         
         LED_COLOR_UPDATE(LED_COLOR_BLUE);
-        statusLED->on();
+        LED_STATUS_UPDATE(on());
     }
 } clientCallbacks;
 
@@ -428,13 +385,15 @@ bool setPluginOnOff(bool state) {
 void setup()
 {
     Serial.begin(115200);
-    setStatusPixel(ledPin, 240.0, 100.0, 40.0);
     // homeSpan.setControlPin(41, PushButton::TRIGGER_ON_LOW);
-    // create Status LED, even is statusDevice is NULL
-    statusLED = new Blinker(statusDevice, autoOffLED);
+
+#ifdef PIN_RGB_LED
+    ReLED.begin(PIN_RGB_LED, true, 0);
+#else
+    ReLED.begin(LED_BUILTIN, false, 0);
+#endif    
     
     LED_STATUS_UPDATE(start(LED_WIFI_NEEDED));
-    // statusLED->on();
 
     Serial.println("Starting BLE and Matter ESP32 Gateway to Switchbot Bot");
 
@@ -459,7 +418,7 @@ void setup()
                 LED_STATUS_UPDATE(start(LED_ALERT));
                 break;
             case Mycila::ESPConnect::State::NETWORK_CONNECTED:
-                statusLED->on();
+                LED_STATUS_UPDATE(on());
                 break;
             default:
                 break;
