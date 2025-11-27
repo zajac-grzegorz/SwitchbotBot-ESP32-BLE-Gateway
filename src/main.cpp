@@ -432,8 +432,9 @@ void setup()
     // homeSpan.setControlPin(41, PushButton::TRIGGER_ON_LOW);
     // create Status LED, even is statusDevice is NULL
     statusLED = new Blinker(statusDevice, autoOffLED);
-    // LED_STATUS_UPDATE(start(LED_WIFI_NEEDED));
-    statusLED->on();
+    
+    LED_STATUS_UPDATE(start(LED_WIFI_NEEDED));
+    // statusLED->on();
 
     Serial.println("Starting BLE and Matter ESP32 Gateway to Switchbot Bot");
 
@@ -447,6 +448,23 @@ void setup()
     // network state listener
     espConnect.listen([](__unused Mycila::ESPConnect::State previous, __unused Mycila::ESPConnect::State state) 
     {
+        switch (state)
+        {
+            case Mycila::ESPConnect::State::NETWORK_CONNECTING:
+            case Mycila::ESPConnect::State::NETWORK_RECONNECTING:
+                LED_STATUS_UPDATE(start(LED_WIFI_CONNECTING));
+                break;
+            case Mycila::ESPConnect::State::NETWORK_DISCONNECTED:
+            case Mycila::ESPConnect::State::NETWORK_TIMEOUT:
+                LED_STATUS_UPDATE(start(LED_ALERT));
+                break;
+            case Mycila::ESPConnect::State::NETWORK_CONNECTED:
+                statusLED->on();
+                break;
+            default:
+                break;
+        }
+
         JsonDocument doc;
         espConnect.toJson(doc.to<JsonObject>());
         serializeJsonPretty(doc, Serial);
