@@ -47,8 +47,8 @@ class ClientCallbacks : public NimBLEClientCallbacks
     {
         conTimeout = millis();
 
-        LED_COLOR_UPDATE(LED_COLOR_RED);
-        LED_STATUS_UPDATE(start(LED_AP_CONNECTED));
+        // LED_COLOR_UPDATE(LED_COLOR_RED);
+        // LED_STATUS_UPDATE(start(LED_AP_CONNECTED));
     }
 
     void onDisconnect(NimBLEClient *pClient, int reason) override
@@ -606,6 +606,9 @@ void loop()
         if (executeSwitchBotCommand(doCommand))
         {
             Serial.println("Success! we should now be getting notifications");
+            
+            LED_COLOR_UPDATE(LED_COLOR_RED);
+            LED_STATUS_UPDATE(start(LED_AP_CONNECTED));
         }
         else
         {
