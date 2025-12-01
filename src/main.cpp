@@ -17,8 +17,9 @@ MatterOnOffPlugin OnOffPlugin;
 std::string botMacAddr = botMac;
 
 static AsyncWebServer server(webServerPort);
-static Mycila::ESPConnect espConnect(server);
 static AsyncWebServerRequestPtr pressRequest;
+
+static Mycila::ESPConnect espConnect(server);
 
 static const NimBLEAdvertisedDevice* advDevice = nullptr;
 static NimBLEScan* pScan = nullptr;
@@ -31,28 +32,6 @@ static uint32_t scanTimeMs = 5000; /** scan time in milliseconds, 0 = scan forev
 static BLEUUID serviceUUID("cba20d00-224d-11e6-9fb8-0002a5d5c51b");
 static BLEUUID controlCharacteristicUUID("cba20002-224d-11e6-9fb8-0002a5d5c51b");
 static BLEUUID notifyCharacteristicUUID("cba20003-224d-11e6-9fb8-0002a5d5c51b");
-
-// To allow log viewing over the web
-WebSerial webSerial;
-
-void configureWebSerial(bool enabled, AsyncWebServer* server)
-{
-   if (enabled)
-   {
-      if (nullptr != server)
-      {
-         logger.forwardTo(&webSerial);
-         webSerial.setBuffer(256);
-         webSerial.begin(server);
-
-         logger.debug(RE_TAG, "Using WebSerial logger");
-      }
-      else
-      {
-         logger.error(RE_TAG, "AsyncWebServer not initialized");
-      }
-   }
-}
 
 Mycila::Task offMatterSwitchTask("Turn Off", [](void* params){
     logger.info(RE_TAG, "-> OFF Switch to false");
@@ -572,7 +551,9 @@ void setup()
     server.onNotFound(handleNotFound);
     server.begin();
 
+    // To allow log viewing over the web
     configureWebSerial(true, &server);
+
     logger.debug(RE_TAG, "Async Web Server started");
 
     /** Initialize NimBLE and set the device name */
