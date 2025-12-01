@@ -6,6 +6,8 @@
 #include <MycilaESPConnect.h>
 #include <MycilaSystem.h>
 #include <MycilaTaskManager.h>
+#include <MycilaWebSerial.h>
+#include "ReCommon.h"
 #include "ReBLEUtils.h"
 #include "ReBLEConfig.h"
 #include "ReLED.h"
@@ -30,9 +32,30 @@ static BLEUUID serviceUUID("cba20d00-224d-11e6-9fb8-0002a5d5c51b");
 static BLEUUID controlCharacteristicUUID("cba20002-224d-11e6-9fb8-0002a5d5c51b");
 static BLEUUID notifyCharacteristicUUID("cba20003-224d-11e6-9fb8-0002a5d5c51b");
 
+// To allow log viewing over the web
+WebSerial webSerial;
+
+void configureWebSerial(bool enabled, AsyncWebServer* server)
+{
+   if (enabled)
+   {
+      if (nullptr != server)
+      {
+         logger.forwardTo(&webSerial);
+         webSerial.setBuffer(256);
+         webSerial.begin(server);
+
+         logger.debug(RE_TAG, "Using WebSerial logger");
+      }
+      else
+      {
+         logger.error(RE_TAG, "AsyncWebServer not initialized");
+      }
+   }
+}
 
 Mycila::Task offMatterSwitchTask("Turn Off", [](void* params){
-    Serial.println("-> OFF Switch to false");
+    logger.info(RE_TAG, "-> OFF Switch to false");
 
     OnOffPlugin.setOnOff(false);
     OnOffPlugin.updateAccessory();
@@ -55,7 +78,7 @@ class ClientCallbacks : public NimBLEClientCallbacks
     {
         uint64_t tm = millis() - conTimeout;
 
-        Serial.printf("%s Disconnected, reason = %d, timeout = %lld\n", 
+        logger.info(RE_TAG, "%s Disconnected, reason = %d, timeout = %lld", 
             pClient->getPeerAddress().toString().c_str(), reason, tm);
         
         LED_COLOR_UPDATE(LED_COLOR_BLUE);
@@ -71,7 +94,7 @@ class ScanCallbacks : public NimBLEScanCallbacks
         // This is a device with our MAC address
         if (advertisedDevice->getAddress().toString() == botMacAddr)
         {
-            Serial.printf("Advertised Device found: %s\n", advertisedDevice->getAddress().toString().c_str());
+            logger.info(RE_TAG, "Advertised Device found: %s", advertisedDevice->getAddress().toString().c_str());
 
             /** stop scan before connecting */
             NimBLEDevice::getScan()->stop();
@@ -85,7 +108,7 @@ class ScanCallbacks : public NimBLEScanCallbacks
     /** Callback to process the results of the completed scan or restart it */
     void onScanEnd(const NimBLEScanResults &results, int reason) override
     {
-        Serial.printf("Scan Ended, reason: %d, device count: %d; Restarting scan\n", reason, results.getCount());
+        logger.info(RE_TAG, "Scan Ended, reason: %d, device count: %d; Restarting scan\n", reason, results.getCount());
         NimBLEDevice::getScan()->start(scanTimeMs, false, true);
     }
 } scanCallbacks;
@@ -96,18 +119,18 @@ void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData,
     std::string str = (isNotify == true) ? "Notification" : "Indication";
     str += " from ";
     str += pRemoteCharacteristic->getClient()->getPeerAddress().toString();
-    Serial.printf("%s\n", str.c_str());
+    logger.debug(RE_TAG, "%s", str.c_str());
 
     str = "* Service = " + pRemoteCharacteristic->getRemoteService()->getUUID().toString();
-    Serial.printf("%s\n", str.c_str());
+    logger.debug(RE_TAG, "%s", str.c_str());
 
     str = "** Characteristic = " + pRemoteCharacteristic->getUUID().toString();
-    Serial.printf("%s\n", str.c_str());
+    logger.debug(RE_TAG, "%s", str.c_str());
 
     std::string resultData = NimBLEUtils::dataToHexString(pData, length);
 
     str = "*** Value = " + resultData;
-    Serial.printf("%s\n", str.c_str());
+    logger.info(RE_TAG, "%s", str.c_str());
 
     if (auto request = pressRequest.lock()) 
     {
@@ -119,9 +142,6 @@ void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData,
         serializeJson(doc, output);
         request->send(200, "application/json", output);
     } 
-
-    // OnOffPlugin.setOnOff(false);
-    // OnOffPlugin.updateAccessory();
 
     offMatterSwitchTask.resume(10000);
 }
@@ -145,18 +165,18 @@ bool connectToSwitchBot()
         {
             if (pClient->isConnected())
             {
-                Serial.println("Client exists and is already conected");
+                logger.info(RE_TAG, "Client exists and is already conected");
                 return true;
             } 
             else
             {
                 if (!pClient->connect(advDevice, false))
                 {
-                    Serial.println("Reconnect failed");
+                    logger.error(RE_TAG, "Reconnect failed");
                     return false;
                 }
 
-                Serial.println("Reconnected client");
+                logger.info(RE_TAG, "Reconnected client");
             }
         }
         else
@@ -174,13 +194,13 @@ bool connectToSwitchBot()
     {
         if (NimBLEDevice::getCreatedClientCount() >= MYNEWT_VAL(BLE_MAX_CONNECTIONS))
         {
-            Serial.println("Max clients reached - no more connections available");
+            logger.error(RE_TAG, "Max clients reached - no more connections available");
             return false;
         }
 
         pClient = NimBLEDevice::createClient();
 
-        Serial.println("New client created");
+        logger.info(RE_TAG, "New client created");
 
         pClient->setClientCallbacks(&clientCallbacks, false);
         /**
@@ -199,7 +219,7 @@ bool connectToSwitchBot()
             /** Created a client but failed to connect, don't need to keep it as it has no data */
             NimBLEDevice::deleteClient(pClient);
 
-            Serial.println("Failed to connect, deleted client");
+            logger.error(RE_TAG, "Failed to connect, deleted client");
             return false;
         }
     }
@@ -208,12 +228,12 @@ bool connectToSwitchBot()
     {
         if (!pClient->connect(advDevice))
         {
-            Serial.println("Failed to connect");
+            logger.error(RE_TAG, "Failed to connect");
             return false;
         }
     }
 
-    Serial.printf("Connected to: %s RSSI: %d\n", pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
+    logger.info(RE_TAG, "Connected to: %s RSSI: %d", pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
 
     /** Now we can read/write/subscribe the characteristics of the services we are interested in */
     NimBLERemoteService *pSvc = nullptr;
@@ -230,7 +250,7 @@ bool connectToSwitchBot()
         {
             if (pChr->canRead())
             {
-                Serial.printf("%s Value: %s\n", pChr->getUUID().toString().c_str(), pChr->readValue().c_str());
+                logger.debug(RE_TAG, "%s Value: %s", pChr->getUUID().toString().c_str(), pChr->readValue().c_str());
             }
 
             if (pChr->canNotify())
@@ -241,7 +261,7 @@ bool connectToSwitchBot()
                     return false;
                 }
 
-                Serial.println("Notifications have been set");
+                logger.info(RE_TAG, "Notifications have been set");
             }
             else if (pChr->canIndicate())
             {
@@ -252,16 +272,16 @@ bool connectToSwitchBot()
                     return false;
                 }
 
-                Serial.println("Indications have been set");
+                logger.debug(RE_TAG, "Indications have been set");
             }
         }
     }
     else
     {
-        Serial.println("SwitchBot Bot service not found");
+        logger.error(RE_TAG, "SwitchBot Bot service not found");
     }
 
-    Serial.println("Connected, subscribed to notifications and waiting for a command...");
+    logger.info(RE_TAG, "Connected, subscribed to notifications and waiting for a command...");
 
     return true;
 }
@@ -271,7 +291,7 @@ bool executeSwitchBotCommand(std::string cmd)
     // Establish connection with the client
     if (!connectToSwitchBot())
     {
-        Serial.println("executeSwitchBotCommand: Client not created");
+        logger.error(RE_TAG, "executeSwitchBotCommand: Client not created");
         return false;
     }
 
@@ -279,14 +299,14 @@ bool executeSwitchBotCommand(std::string cmd)
     
     if (!pClient)
     {
-        Serial.println("executeSwitchBotCommand: Client not exists");
+        logger.error(RE_TAG, "executeSwitchBotCommand: Client not exists");
         return false;
     }
     else
     {
         if (!pClient->isConnected())
         {
-            Serial.println("executeSwitchBotCommand: Client not connected");
+            logger.error(RE_TAG, "executeSwitchBotCommand: Client not connected");
             return false;
         }
     }
@@ -305,24 +325,24 @@ bool executeSwitchBotCommand(std::string cmd)
         {
             if (pChr->canRead())
             {
-                Serial.printf("%s Value: %s\n", pChr->getUUID().toString().c_str(), pChr->readValue().c_str());
+                logger.debug(RE_TAG, "%s Value: %s", pChr->getUUID().toString().c_str(), pChr->readValue().c_str());
             }
 
             if (pChr->canWrite())
             {
                 std::vector<uint8_t> vPress = stringToHexArray(cmd);
-                Serial.printf("Command data: %s\n", NimBLEUtils::dataToHexString(vPress.data(), vPress.size()).c_str());
+                logger.info(RE_TAG, "Command data: %s", NimBLEUtils::dataToHexString(vPress.data(), vPress.size()).c_str());
 
                 // All command for Bot must start with 0x57 byte
                 if (vPress.at(0) != 0x57)
                 {
-                    Serial.println("Write failed - command must start with 0x57 byte");
+                    logger.error(RE_TAG, "Write failed - command must start with 0x57 byte");
                     return false;
                 }
 
                 if (pChr->writeValue(vPress, true))
                 {
-                    Serial.printf("Wrote new value to: %s\n", pChr->getUUID().toString().c_str());
+                    logger.info(RE_TAG, "Wrote new value to: %s", pChr->getUUID().toString().c_str());
                 }
                 else
                 {
@@ -332,14 +352,14 @@ bool executeSwitchBotCommand(std::string cmd)
 
                 if (pChr->canRead())
                 {
-                    Serial.printf("The value of: %s is now: %s\n", pChr->getUUID().toString().c_str(), pChr->readValue().c_str());
+                    logger.info(RE_TAG, "The value of: %s is now: %s", pChr->getUUID().toString().c_str(), pChr->readValue().c_str());
                 }
             }
         }
     }
     else
     {
-        Serial.println("Switchbot Bot service not found.");
+        logger.error(RE_TAG, "Switchbot Bot service not found.");
     }
 
     return true;
@@ -369,7 +389,7 @@ void handleNotFound(AsyncWebServerRequest *request)
 
 // Matter Protocol Endpoint Callback
 bool setPluginOnOff(bool state) {
-    Serial.printf("User Callback :: New Plugin State = %s\r\n", state ? "ON" : "OFF");
+    logger.info(RE_TAG, "User Callback :: New Plugin State = %s", state ? "ON" : "OFF");
   
     doCommand = "570100";
 
@@ -384,6 +404,9 @@ bool setPluginOnOff(bool state) {
 void setup()
 {
     Serial.begin(115200);
+
+    logger.forwardTo(&Serial);
+    logger.debug(RE_TAG, "Using Serial as terminal");
     // homeSpan.setControlPin(41, PushButton::TRIGGER_ON_LOW);
 
 #ifdef PIN_RGB_LED
@@ -394,13 +417,13 @@ void setup()
     
     LED_STATUS_UPDATE(start(LED_WIFI_NEEDED));
 
-    Serial.println("Starting BLE and Matter ESP32 Gateway to Switchbot Bot");
+    logger.debug(RE_TAG, "Starting BLE and Matter ESP32 Gateway to Switchbot Bot");
 
     offMatterSwitchTask.setEnabled(true);
     offMatterSwitchTask.setType(Mycila::Task::Type::ONCE);
 
     offMatterSwitchTask.onDone([](const Mycila::Task& me, uint32_t elapsed) {
-        Serial.printf("Task '%s' executed in %ld us\n", me.name(), elapsed);
+        logger.debug(RE_TAG, "Task '%s' executed in %ld us", me.name(), elapsed);
     });
 
     // network state listener
@@ -431,9 +454,9 @@ void setup()
 
     espConnect.setAutoRestart(true);
     espConnect.setBlocking(true);
-    Serial.println("Trying to connect to saved WiFi or will start portal...");
+    logger.debug(RE_TAG, "Trying to connect to saved WiFi or will start portal...");
     espConnect.begin("BLEGateway", "BLEGateway");
-    Serial.println("ESPConnect completed, continuing setup()...");
+    logger.debug(RE_TAG, "ESPConnect completed, continuing setup()...");
 
     // serve your home page here
     server.on("/", handleRoot).setFilter([](__unused AsyncWebServerRequest* request) 
@@ -483,7 +506,7 @@ void setup()
 
     server.on("/admin/decomission", HTTP_GET, [](AsyncWebServerRequest *request)
     {
-        Serial.println("Decommissioning the Plugin Matter Accessory. It shall be commissioned again");
+        logger.debug(RE_TAG, "Decommissioning the Plugin Matter Accessory. It shall be commissioned again");
         OnOffPlugin.setOnOff(false);
         Matter.decommission();
 
@@ -549,7 +572,8 @@ void setup()
     server.onNotFound(handleNotFound);
     server.begin();
 
-    Serial.println("Async Web Server started");
+    configureWebSerial(true, &server);
+    logger.debug(RE_TAG, "Async Web Server started");
 
     /** Initialize NimBLE and set the device name */
     NimBLEDevice::init("SwitchBot-Bot-Client");
@@ -580,13 +604,13 @@ void setup()
     // This may be a restart of a already commissioned Matter accessory
     if (Matter.isDeviceCommissioned()) 
     {
-        Serial.println("Matter Node is commissioned and connected to the network. Ready for use");
-        Serial.printf("Initial state: %s\r\n", OnOffPlugin.getOnOff() ? "ON" : "OFF");
+        logger.debug(RE_TAG, "Matter Node is commissioned and connected to the network. Ready for use");
+        logger.debug(RE_TAG, "Initial state: %s", OnOffPlugin.getOnOff() ? "ON" : "OFF");
         OnOffPlugin.updateAccessory();  // configure the Plugin based on initial state
     }
     else
     {
-        Serial.printf("Matter comission code is: %s\n", Matter.getManualPairingCode().c_str());
+        logger.debug(RE_TAG, "Matter comission code is: %s", Matter.getManualPairingCode().c_str());
     }
 
     /** Start scanning for advertisers */ // move this to matter event handler?
@@ -602,21 +626,18 @@ void loop()
     {
         doConnect = false;
         /** Found a device we want to connect to, do it now */
-        // if (connectToSwitchBot())
         if (executeSwitchBotCommand(doCommand))
         {
-            Serial.println("Success! we should now be getting notifications");
+            logger.debug(RE_TAG, "Success! we should now be getting notifications");
             
             LED_COLOR_UPDATE(LED_COLOR_RED);
             LED_STATUS_UPDATE(start(LED_AP_CONNECTED));
         }
         else
         {
-            Serial.println("Failed to connect");
+            logger.error(RE_TAG, "Failed to connect");
 
             offMatterSwitchTask.resume(10000);
-            // OnOffPlugin.setOnOff(false);
-            // OnOffPlugin.updateAccessory();
 
             if (auto request = pressRequest.lock()) 
             {
