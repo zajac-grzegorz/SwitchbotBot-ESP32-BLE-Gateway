@@ -398,6 +398,8 @@ void setup()
 
     logger.debug(RE_TAG, "Starting BLE and Matter ESP32 Gateway to Switchbot Bot");
 
+    configureStorage();
+
     offMatterSwitchTask.setEnabled(true);
     offMatterSwitchTask.setType(Mycila::Task::Type::ONCE);
 
@@ -443,7 +445,7 @@ void setup()
         return espConnect.getState() != Mycila::ESPConnect::State::PORTAL_STARTED; 
     });
     
-    server.on("/", handleRoot);
+    // server.on("/", handleRoot);
 
     // clear persisted config
     server.on("/admin/clear", HTTP_GET, [&](AsyncWebServerRequest* request) 
@@ -552,7 +554,7 @@ void setup()
     server.begin();
 
     // To allow log viewing over the web
-    configureWebSerial(true, &server);
+    configureWebSerial(false, &server);
 
     logger.debug(RE_TAG, "Async Web Server started");
 
@@ -596,6 +598,11 @@ void setup()
 
     /** Start scanning for advertisers */ // move this to matter event handler?
     pScan->start(scanTimeMs);
+
+    bool webSerialOn = config.get<bool>("webserial_on");
+    const char* bleMac = config.getString("ble_mac");
+
+    Serial.printf("WebSerial: %d, MAC: %s\n", webSerialOn, bleMac);
 }
 
 void loop()

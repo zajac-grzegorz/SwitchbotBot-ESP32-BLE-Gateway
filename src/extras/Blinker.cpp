@@ -74,7 +74,7 @@ void Blinker::start(int period, float dutyCycle, int nBlinks, int delayTime){
   this->nBlinks=nBlinks;
 
   stop();  
-  xTaskCreate( blinkTask, "BlinkTask", 1024, (void *)this, 2, &blinkHandle );
+  xTaskCreate( blinkTask, "BlinkTask", 2048, (void *)this, 2, &blinkHandle );
 
   pauseTime=millis();
   isPaused=false;
