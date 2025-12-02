@@ -18,6 +18,8 @@ std::string botMacAddr = botMac;
 
 static AsyncWebServer server(webServerPort);
 static AsyncWebServerRequestPtr pressRequest;
+// basicAuth
+static AsyncAuthenticationMiddleware basicAuth;
 
 static Mycila::ESPConnect espConnect(server);
 
@@ -26,7 +28,6 @@ static NimBLEScan* pScan = nullptr;
 
 static bool doConnect = false;
 static std::string doCommand = "570100"; // default is press command
-static uint64_t conTimeout = 0;
 static uint32_t scanTimeMs = 5000; /** scan time in milliseconds, 0 = scan forever */
 
 static BLEUUID serviceUUID("cba20d00-224d-11e6-9fb8-0002a5d5c51b");
@@ -63,6 +64,10 @@ class ClientCallbacks : public NimBLEClientCallbacks
         LED_COLOR_UPDATE(LED_COLOR_BLUE);
         LED_STATUS_UPDATE(on());
     }
+
+    private:
+        uint64_t conTimeout = 0;
+
 } clientCallbacks;
 
 /** Define a class to handle the callbacks when scan events are received */
@@ -388,6 +393,7 @@ void setup()
     logger.debug(RE_TAG, "Using Serial as terminal");
     // homeSpan.setControlPin(41, PushButton::TRIGGER_ON_LOW);
 
+    // Configure RGB led or normal led, depending on the board type
 #ifdef PIN_RGB_LED
     ReLED.begin(PIN_RGB_LED, true, 0);
 #else
@@ -407,6 +413,14 @@ void setup()
     logger.debug(RE_TAG, "Starting BLE and Matter ESP32 Gateway to Switchbot Bot");
 
     configureStorage();
+
+    // basic authentication
+    basicAuth.setUsername("admin");
+    basicAuth.setPassword("admin");
+    basicAuth.setRealm("MyApp");
+    basicAuth.setAuthFailureMessage("Authentication failed");
+    basicAuth.setAuthType(AsyncAuthType::AUTH_BASIC);
+    basicAuth.generateHash();  // precompute hash (optional but recommended)
 
     offMatterSwitchTask.setEnabled(true);
     offMatterSwitchTask.setType(Mycila::Task::Type::ONCE);
@@ -453,15 +467,13 @@ void setup()
         return espConnect.getState() != Mycila::ESPConnect::State::PORTAL_STARTED; 
     });
     
-    // server.on("/", handleRoot);
-
     // clear persisted config
     server.on("/admin/clear", HTTP_GET, [&](AsyncWebServerRequest* request) 
     {
         espConnect.clearConfiguration();
         request->send(200);
         ESP.restart();
-    });
+    }).addMiddleware(&basicAuth);
 
     server.on("/heap", HTTP_GET, [](AsyncWebServerRequest *request)
     {
@@ -480,18 +492,18 @@ void setup()
     {
         request->send(200, "text/plain", "Device has been restarted");
         ESP.restart();
-    });
+    }).addMiddleware(&basicAuth);
 
     server.on("/admin/safeboot", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         request->send(200, "text/html", "<form method='POST' action='/admin/safeboot' enctype='multipart/form-data'><input type='submit' value='Restart in SafeBoot mode'></form>");
-    });
+    }).addMiddleware(&basicAuth);
 
     server.on("/admin/safeboot", HTTP_POST, [](AsyncWebServerRequest *request)
     {
         request->send(200, "text/plain", "Restarting in SafeBoot mode...");
         Mycila::System::restartFactory("safeboot", 1000);
-    });
+    }).addMiddleware(&basicAuth);
 
     server.on("/admin/decomission", HTTP_GET, [](AsyncWebServerRequest *request)
     {
@@ -500,7 +512,7 @@ void setup()
         Matter.decommission();
 
         request->send(200, "text/plain", "Decommissioning the Matter Accessory. It shall be commissioned again");
-    });
+    }).addMiddleware(&basicAuth);;
 
     server.on("/switchbot/press", HTTP_GET, [](AsyncWebServerRequest *request)
     {
