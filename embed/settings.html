@@ -1,0 +1,316 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Admin Settings</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background-color: #f0f8ff; /* Light blue background */
+    margin: 0;
+    padding: 20px;
+    color: #333;
+  }
+
+  h2 {
+    text-align: center;
+    color: #1e90ff; /* DodgerBlue */
+    margin-bottom: 20px;
+  }
+
+  form {
+    max-width: 400px;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  .field {
+    margin: 20px 20px 0px 0px;
+  }
+
+  label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #1e90ff;
+  }
+
+  input[type="text"],
+  input[type="number"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #b0c4de; /* LightSteelBlue */
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+  }
+
+  input[type="text"]:focus,
+  input[type="number"]:focus {
+    border-color: #1e90ff;
+    outline: none;
+    box-shadow: 0 0 5px rgba(30, 144, 255, 0.3);
+  }
+
+  .error {
+    color: #b00020;
+    font-size: 0.85em;
+    margin-top: 4px;
+    min-height: 18px;
+  }
+
+  .invalid input {
+    border-color: #b00020;
+    background: #fff5f5;
+  }
+
+  .actions {
+    text-align: center;
+    margin-top: 20px;
+  }
+
+  button {
+    background-color: #1e90ff;
+    color: #fff;
+    border: none;
+    padding: 12px 20px;
+    font-size: 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+
+  button:hover:not([disabled]) {
+    background-color: #4682b4; /* SteelBlue */
+  }
+
+  button[disabled] {
+    background-color: #87cefa; /* LightSkyBlue */
+    cursor: not-allowed;
+  }
+
+  .status {
+    margin-top: 15px;
+    text-align: center;
+    font-size: 0.95em;
+    color: #333;
+  }
+</style>
+</head>
+<body>
+  <h2>Switchbot Bot BLE Gateway Settings</h2>
+
+  <form id="settingsForm" novalidate>
+    <div class="field" id="macField">
+      <label for="mac">MAC Address (format XX:XX:XX:XX:XX:XX):</label>
+      <input
+        type="text"
+        id="mac"
+        name="mac"
+        placeholder="AA:BB:CC:DD:EE:FF"
+        required
+        inputmode="latin"
+        autocomplete="off"
+      />
+      <div class="error" id="macError"></div>
+    </div>
+
+    <div class="field" id="portField">
+      <label for="port">Server Port (1–65535):</label>
+      <input
+        type="number"
+        id="port"
+        name="port"
+        min="1"
+        max="65535"
+        required
+        inputmode="numeric"
+        autocomplete="off"
+      />
+      <div class="error" id="portError"></div>
+    </div>
+
+    <div class="field" id="scanTimeField">
+      <label for="scanTime">Scan Time (milliseconds, 1000–20000):</label>
+      <input
+        type="number"
+        id="scanTime"
+        name="scanTime"
+        min="1000"
+        max="20000"
+        step="500"
+        required
+        inputmode="numeric"
+        autocomplete="off"
+      />
+      <div class="error" id="scanTimeError"></div>
+    </div>
+
+    <div class="field">
+      <label>
+        <input type="checkbox" id="webSerial" name="webSerial" />
+        Enable WebSerial
+      </label>
+    </div>
+
+    <div class="actions">
+      <button type="submit" id="saveBtn" disabled>Save Settings</button>
+    </div>
+
+    <div class="status" id="statusMsg" aria-live="polite"></div>
+  </form>
+
+  <script>
+    const macPattern = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
+
+    function validateMac(value) {
+      if (!value) return "MAC address is required.";
+      if (!macPattern.test(value.trim())) {
+        return "Invalid MAC format. Expected XX:XX:XX:XX:XX:XX.";
+      }
+      return "";
+    }
+
+    function validatePort(value) {
+      if (value === "" || value === null) return "Server port is required.";
+      const n = Number(value);
+      if (!Number.isInteger(n)) return "Port must be an integer.";
+      if (n < 1 || n > 65535) return "Port must be between 1 and 65535.";
+      return "";
+    }
+
+    function validateScanTime(value) {
+      if (value === "" || value === null) return "Scan time is required.";
+      const n = Number(value);
+      if (!Number.isInteger(n)) return "Scan time must be an integer.";
+      if (n < 1000) return "Scan time must be at least 1000 .";
+      if (n > 20000) return "Scan time cannot exceed 20000 ms.";
+      return "";
+    }
+
+    const form = document.getElementById("settingsForm");
+    const macInput = document.getElementById("mac");
+    const portInput = document.getElementById("port");
+    const scanTimeInput = document.getElementById("scanTime");
+    const webSerialInput = document.getElementById("webSerial");
+
+    const macError = document.getElementById("macError");
+    const portError = document.getElementById("portError");
+    const scanTimeError = document.getElementById("scanTimeError");
+
+    const macField = document.getElementById("macField");
+    const portField = document.getElementById("portField");
+    const scanTimeField = document.getElementById("scanTimeField");
+
+    const saveBtn = document.getElementById("saveBtn");
+    const statusMsg = document.getElementById("statusMsg");
+
+    function setFieldValidity(fieldEl, errorEl, errorText) {
+      if (errorText) {
+        fieldEl.classList.add("invalid");
+        errorEl.textContent = errorText;
+      } else {
+        fieldEl.classList.remove("invalid");
+        errorEl.textContent = "";
+      }
+    }
+
+    function validateAll() {
+      const macErr = validateMac(macInput.value);
+      const portErr = validatePort(portInput.value);
+      const scanErr = validateScanTime(scanTimeInput.value);
+
+      setFieldValidity(macField, macError, macErr);
+      setFieldValidity(portField, portError, portErr);
+      setFieldValidity(scanTimeField, scanTimeError, scanErr);
+
+      const htmlValid =
+        macInput.checkValidity() &&
+        portInput.checkValidity() &&
+        scanTimeInput.checkValidity();
+
+      const allValid = !macErr && !portErr && !scanErr && htmlValid;
+      saveBtn.disabled = !allValid;
+      return allValid;
+    }
+
+    function debounce(fn, delay = 200) {
+      let t;
+      return function (...args) {
+        clearTimeout(t);
+        t = setTimeout(() => fn.apply(this, args), delay);
+      };
+    }
+
+    const validateAllDebounced = debounce(validateAll, 120);
+
+    macInput.addEventListener("input", validateAllDebounced);
+    portInput.addEventListener("input", validateAllDebounced);
+    scanTimeInput.addEventListener("input", validateAllDebounced);
+
+    macInput.addEventListener("blur", validateAll);
+    portInput.addEventListener("blur", validateAll);
+    scanTimeInput.addEventListener("blur", validateAll);
+
+    document.addEventListener("DOMContentLoaded", () => {
+      statusMsg.textContent = "Loading settings…";
+      fetch("/admin/settings")
+        .then((res) => res.ok ? res.json() : Promise.reject(res))
+        .then((data) => {
+          macInput.value = data.ble_mac ?? "";
+          portInput.value = data.web_port ?? 3000;
+          scanTimeInput.value = data.scan_time ?? 1000;
+          webSerialInput.checked = !!data.webserial_on;
+
+          validateAll();
+          statusMsg.textContent = "";
+        })
+        .catch((err) => {
+          console.error("Error loading settings:", err);
+          statusMsg.textContent = "Failed to load settings.";
+          validateAll();
+        });
+    });
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const ok = validateAll();
+      if (!ok) {
+        statusMsg.textContent = "Please fix validation errors before saving.";
+        return;
+      }
+
+      const payload = {
+        ble_mac: macInput.value.trim(),
+        web_port: Number(portInput.value),
+        scan_time: Number(scanTimeInput.value),
+        webserial_on: webSerialInput.checked
+      };
+
+      saveBtn.disabled = true;
+      statusMsg.textContent = "Saving…";
+
+      fetch("/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+        .then((res) => res.ok ? res.json() : Promise.reject(res))
+        .then(() => {
+          statusMsg.textContent = "Settings saved successfully.";
+        })
+        .catch((err) => {
+          console.error("Error saving settings:", err);
+          statusMsg.textContent = "Failed to save settings.";
+        })
+        .finally(() => {
+          validateAll();
+        });
+    });
+  </script>
+</body>
+</html>

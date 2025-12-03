@@ -12,6 +12,10 @@
 #include "ReBLEConfig.h"
 #include "ReLED.h"
 
+// move to separate file
+extern const uint8_t update_html_start[] asm("_binary__pio_embed_settings_html_gz_start");
+extern const uint8_t update_html_end[] asm("_binary__pio_embed_settings_html_gz_end");
+
 MatterOnOffPlugin OnOffPlugin;
 
 std::string botMacAddr = botMac;
@@ -474,9 +478,17 @@ void setup()
         request->send(200);
         ESP.restart();
     }).addMiddleware(&basicAuth);
-    
+
+    server.on(AsyncURIMatcher::exact("/admin"), HTTP_GET, [&](AsyncWebServerRequest* request) 
+    {
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (uint8_t*)(update_html_start), update_html_end - update_html_start);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+        // server.send_P(200, "text/html", reinterpret_cast<const char*>(update_html_start), update_html_end - update_html_start);
+    });
+
     // get stored admin settings
-    server.on("/admin/settings", HTTP_GET, [&](AsyncWebServerRequest* request) 
+    server.on(AsyncURIMatcher::exact("/admin/settings"), HTTP_GET, [&](AsyncWebServerRequest* request) 
     {
         AsyncJsonResponse *response = new AsyncJsonResponse();
         JsonObject doc = response->getRoot().to<JsonObject>();
@@ -489,12 +501,15 @@ void setup()
         request->send(response);
     });
 
-     // get stored admin settings
-    server.on("/admin/settings", HTTP_POST, [&](AsyncWebServerRequest* request, JsonVariant &json) 
+     // store new admin settings
+    server.on(AsyncURIMatcher::exact("/admin/settings"), HTTP_POST, [&](AsyncWebServerRequest* request, JsonVariant &json) 
     {
-        Serial.printf("Body request : ");
-        serializeJson(json, Serial);
-        Serial.println();
+        JsonObject doc = json.as<JsonObject>();
+
+        config.setString("ble_mac", doc["ble_mac"].as<const char*>());
+        config.set<int>("web_port", doc["web_port"].as<int>());
+        config.set<int>("scan_time", doc["scan_time"].as<int>());
+        config.set<bool>("webserial_on", doc["webserial_on"].as<bool>());
 
         request->send(200, "application/json", "{}");
     });
