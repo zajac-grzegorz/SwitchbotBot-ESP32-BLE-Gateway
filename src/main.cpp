@@ -474,6 +474,30 @@ void setup()
         request->send(200);
         ESP.restart();
     }).addMiddleware(&basicAuth);
+    
+    // get stored admin settings
+    server.on("/admin/settings", HTTP_GET, [&](AsyncWebServerRequest* request) 
+    {
+        AsyncJsonResponse *response = new AsyncJsonResponse();
+        JsonObject doc = response->getRoot().to<JsonObject>();
+        doc["ble_mac"] = config.getString("ble_mac");
+        doc["web_port"] = config.get<int>("web_port");
+        doc["scan_time"] = config.get<int>("scan_time");
+        doc["webserial_on"] = config.get<bool>("webserial_on");
+        
+        response->setLength();
+        request->send(response);
+    });
+
+     // get stored admin settings
+    server.on("/admin/settings", HTTP_POST, [&](AsyncWebServerRequest* request, JsonVariant &json) 
+    {
+        Serial.printf("Body request : ");
+        serializeJson(json, Serial);
+        Serial.println();
+
+        request->send(200, "application/json", "{}");
+    });
 
     server.on("/heap", HTTP_GET, [](AsyncWebServerRequest *request)
     {
@@ -639,7 +663,7 @@ void loop()
             logger.debug(RE_TAG, "Success! we should now be getting notifications");
             
             LED_COLOR_UPDATE(LED_COLOR_RED);
-            LED_STATUS_UPDATE(start(LED_AP_CONNECTED));
+            LED_STATUS_UPDATE(start(LED_AP_STARTED));
         }
         else
         {
