@@ -8,14 +8,16 @@
 #define LED_PAIRING_NEEDED      300,0.5,2,2400      // slow double-blink
 #define LED_ALERT               100                 // rapid flashing
 #define LED_WIFI_CONNECTING     2000                // slow flashing
-#define LED_AP_STARTED          100,0.5,2,300       // rapid double-blink
-#define LED_AP_CONNECTED        300,0.5,2,400       // medium double-blink    
-#define LED_OTA_STARTED         300,0.5,3,400       // medium triple-blink
 #define LED_WIFI_SCANNING       300,0.8,3,400       // medium inverted triple-blink
+#define LED_BLE_SCANNING        1000                // medium flashing
+#define LED_BLE_ALERT           500                 
+#define LED_BLE_PROCESSING      500,0.5,2,200
+#define LED_BLE_IDLE            5000,0.5,2,0
 
 #define LED_COLOR_RED           100,0,0
 #define LED_COLOR_GREEN         0,100,0
 #define LED_COLOR_BLUE          0,0,100
+#define LED_COLOR_ORANGE        255,190,0
 
 #define LED_STATUS_UPDATE(LED_UPDATE) {ReLED.getStatusLED()->LED_UPDATE;}
 #define LED_COLOR_UPDATE(RGB_COLOR) { \

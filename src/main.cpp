@@ -45,7 +45,7 @@ Mycila::Task offMatterSwitchTask("Turn Off", [](void* params){
     OnOffPlugin.updateAccessory();
 
     LED_COLOR_UPDATE(LED_COLOR_GREEN);
-    LED_STATUS_UPDATE(on());
+    LED_STATUS_UPDATE(start(LED_BLE_IDLE));
 });
 
 class ClientCallbacks : public NimBLEClientCallbacks
@@ -58,6 +58,14 @@ class ClientCallbacks : public NimBLEClientCallbacks
         // LED_STATUS_UPDATE(start(LED_AP_CONNECTED));
     }
 
+    void onConnectFail(NimBLEClient* pClient, int reason) override
+    {
+        logger.info(RE_TAG, "BLE connection failed");
+        
+        LED_COLOR_UPDATE(LED_COLOR_RED);
+        LED_STATUS_UPDATE(start(LED_BLE_ALERT));
+    }
+
     void onDisconnect(NimBLEClient *pClient, int reason) override
     {
         uint64_t tm = millis() - conTimeout;
@@ -65,7 +73,7 @@ class ClientCallbacks : public NimBLEClientCallbacks
         logger.info(RE_TAG, "%s Disconnected, reason = %d, timeout = %lld", 
             pClient->getPeerAddress().toString().c_str(), reason, tm);
         
-        LED_COLOR_UPDATE(LED_COLOR_BLUE);
+        LED_COLOR_UPDATE(LED_COLOR_GREEN);
         LED_STATUS_UPDATE(on());
     }
 
@@ -89,6 +97,10 @@ class ScanCallbacks : public NimBLEScanCallbacks
 
             /** Save the device reference in a global for the client to use*/
             advDevice = advertisedDevice;
+
+            LED_COLOR_UPDATE(LED_COLOR_GREEN);
+            LED_STATUS_UPDATE(on());
+            
             // doConnect = true;
         }
     }
@@ -98,6 +110,9 @@ class ScanCallbacks : public NimBLEScanCallbacks
     {
         logger.info(RE_TAG, "Scan Ended, reason: %d, device count: %d; Restarting scan\n", reason, results.getCount());
         NimBLEDevice::getScan()->start(scanTimeMs, false, true);
+
+        LED_COLOR_UPDATE(LED_COLOR_GREEN);
+        LED_STATUS_UPDATE(start(LED_BLE_SCANNING));
     }
 } scanCallbacks;
 
@@ -658,10 +673,8 @@ void setup()
     /** Start scanning for advertisers */ // move this to matter event handler?
     pScan->start(scanTimeMs);
 
-    bool webSerialOn = config.get<bool>("webserial_on");
-    const char* bleMac = config.getString("ble_mac");
-
-    Serial.printf("WebSerial: %d, MAC: %s\n", webSerialOn, bleMac);
+    LED_COLOR_UPDATE(LED_COLOR_GREEN);
+    LED_STATUS_UPDATE(start(LED_BLE_SCANNING));
 }
 
 void loop()
@@ -677,8 +690,8 @@ void loop()
         {
             logger.debug(RE_TAG, "Success! we should now be getting notifications");
             
-            LED_COLOR_UPDATE(LED_COLOR_RED);
-            LED_STATUS_UPDATE(start(LED_AP_STARTED));
+            LED_COLOR_UPDATE(LED_COLOR_ORANGE);
+            LED_STATUS_UPDATE(start(LED_BLE_PROCESSING));
         }
         else
         {
