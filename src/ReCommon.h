@@ -10,6 +10,9 @@
 #define RETAG(a, b) a ":" RELINE(b)
 #define RE_TAG RETAG(__FILE__, __LINE__)
 
+extern const uint8_t update_html_start[] asm("_binary__pio_embed_settings_html_gz_start");
+extern const uint8_t update_html_end[] asm("_binary__pio_embed_settings_html_gz_end");
+
 inline Mycila::config::NVS storage;
 inline Mycila::config::Config config(storage);
 

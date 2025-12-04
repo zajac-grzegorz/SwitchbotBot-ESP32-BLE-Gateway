@@ -12,14 +12,6 @@
 #include "ReBLEConfig.h"
 #include "ReLED.h"
 
-// move to separate file
-extern const uint8_t update_html_start[] asm("_binary__pio_embed_settings_html_gz_start");
-extern const uint8_t update_html_end[] asm("_binary__pio_embed_settings_html_gz_end");
-
-MatterOnOffPlugin OnOffPlugin;
-
-std::string botMacAddr = botMac;
-
 static AsyncWebServer server(webServerPort);
 static AsyncWebServerRequestPtr pressRequest;
 // basicAuth
@@ -30,9 +22,10 @@ static Mycila::ESPConnect espConnect(server);
 static const NimBLEAdvertisedDevice* advDevice = nullptr;
 static NimBLEScan* pScan = nullptr;
 
-static bool doConnect = false;
-static std::string doCommand = "570100"; // default is press command
-static uint32_t scanTimeMs = 5000; /** scan time in milliseconds, 0 = scan forever */
+// these can be inline global variables
+inline bool doConnect = false;
+inline std::string doCommand = "570100"; // default is press command
+inline MatterOnOffPlugin OnOffPlugin;
 
 static BLEUUID serviceUUID("cba20d00-224d-11e6-9fb8-0002a5d5c51b");
 static BLEUUID controlCharacteristicUUID("cba20002-224d-11e6-9fb8-0002a5d5c51b");
@@ -80,6 +73,7 @@ class ScanCallbacks : public NimBLEScanCallbacks
     void onResult(const NimBLEAdvertisedDevice *advertisedDevice) override
     {
         // This is a device with our MAC address
+        std::string botMacAddr = config.getString("ble_mac");
         if (advertisedDevice->getAddress().toString() == botMacAddr)
         {
             logger.info(RE_TAG, "Advertised Device found: %s", advertisedDevice->getAddress().toString().c_str());
@@ -101,6 +95,7 @@ class ScanCallbacks : public NimBLEScanCallbacks
     void onScanEnd(const NimBLEScanResults &results, int reason) override
     {
         logger.info(RE_TAG, "Scan Ended, reason: %d, device count: %d; Restarting scan\n", reason, results.getCount());
+        int scanTimeMs = config.get<int>("scan_time");
         NimBLEDevice::getScan()->start(scanTimeMs, false, true);
 
         LED_COLOR_UPDATE(LED_COLOR_GREEN);
@@ -423,6 +418,7 @@ void setup()
 
     logger.debug(RE_TAG, "Starting BLE and Matter ESP32 Gateway to Switchbot Bot");
 
+    // load configuration data from NVS
     configureStorage();
 
     // basic authentication
@@ -626,7 +622,7 @@ void setup()
 
     /** Initialize NimBLE and set the device name */
     NimBLEDevice::init("SwitchBot-Bot-Client");
-    NimBLEDevice::whiteListAdd(NimBLEAddress(botMacAddr, 0));
+    NimBLEDevice::whiteListAdd(NimBLEAddress(config.getString("ble_mac"), 0));
     NimBLEDevice::setPower(ESP_PWR_LVL_P9); /** +9dbm */
 
     pScan = NimBLEDevice::getScan();
@@ -663,6 +659,7 @@ void setup()
     }
 
     /** Start scanning for advertisers */ // move this to matter event handler?
+    int scanTimeMs = config.get<int>("scan_time");
     pScan->start(scanTimeMs);
 
     LED_COLOR_UPDATE(LED_COLOR_GREEN);
