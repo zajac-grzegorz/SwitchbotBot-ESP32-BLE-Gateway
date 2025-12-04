@@ -498,6 +498,8 @@ void setup()
         doc["ble_mac"] = config.getString("ble_mac");
         doc["web_port"] = config.get<int>("web_port");
         doc["scan_time"] = config.get<int>("scan_time");
+        doc["ble_power"] = config.get<int>("ble_power");
+        doc["admin_pass"] = config.getString("admin_pass");
         doc["webserial_on"] = config.get<bool>("webserial_on");
         
         response->setLength();
@@ -512,7 +514,11 @@ void setup()
         config.setString("ble_mac", doc["ble_mac"].as<const char*>());
         config.set<int>("web_port", doc["web_port"].as<int>());
         config.set<int>("scan_time", doc["scan_time"].as<int>());
+        config.set<int>("ble_power", doc["ble_power"].as<int>());
+        config.setString("admin_pass", doc["admin_pass"].as<const char*>());
         config.set<bool>("webserial_on", doc["webserial_on"].as<bool>());
+
+        serializeJson(doc, Serial);
 
         request->send(200, "application/json", "{}");
     });

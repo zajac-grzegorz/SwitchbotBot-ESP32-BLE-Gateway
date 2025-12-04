@@ -1,170 +1,343 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Admin Settings</title>
-<style>
-  body {
-    font-family: 'Segoe UI', Arial, sans-serif;
-    background-color: #f0f8ff; /* Light blue background */
-    margin: 0;
-    padding: 20px;
-    color: #333;
-  }
+  <meta charset="UTF-8" />
+  <title>BLE Gateway Settings</title>
+  <!-- Mobile-friendly scaling -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <style>
+    :root {
+      /* Light blue theme */
+      --bg: #f0f8ff;            /* AliceBlue */
+      --card-bg: #ffffff;
+      --primary: #1e90ff;       /* DodgerBlue */
+      --primary-700: #1c86ee;
+      --primary-900: #0f5ea8;
+      --steel: #b0c4de;         /* LightSteelBlue */
+      --danger: #dc3545;
+      --danger-700: #c82333;
+      --warn: #ff8c00;
+      --warn-700: #ff7f50;
+      --secondary: #00bfff;     /* DeepSkyBlue */
+      --text: #243b53;
+      --muted: #4f6d7a;
+      --error: #b00020;
 
-  h2 {
-    text-align: center;
-    color: #1e90ff; /* DodgerBlue */
-    margin-bottom: 20px;
-  }
+      /* Compact spacing scale */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
 
-  form {
-    max-width: 400px;
-    margin: 0 auto;
-    background: #ffffff;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  }
+      /* Horizontal padding inside the white form container (symmetric) */
+      --inner-pad-x: 16px;
 
-  .field {
-    margin: 20px 20px 0px 0px;
-  }
+      /* Compact radius and shadows */
+      --radius: 10px;
+      --shadow: 0 4px 12px rgba(0,0,0,0.10);
+      --shadow-focus: 0 0 0 3px rgba(30,144,255,0.28);
+    }
 
-  label {
-    display: block;
-    font-weight: 600;
-    margin-bottom: 6px;
-    color: #1e90ff;
-  }
+    /* Base layout */
+    html, body { height: 100%; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background-color: var(--bg);
+      margin: 0;
+      color: var(--text);
+      font-size: clamp(12px, 1.15vw, 15px);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      padding: var(--space-5) var(--space-3);
+    }
 
-  input[type="text"],
-  input[type="number"] {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #b0c4de; /* LightSteelBlue */
-    border-radius: 6px;
-    font-size: 14px;
-    transition: border-color 0.3s;
-  }
+    /* Container & form widths (compact, centered) */
+    .container {
+      max-width: 620px;
+      margin: 0 auto;
+    }
+    form {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: var(--space-4) 0; /* vertical only; horizontal via .form-inner */
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    .form-inner { padding: 0 var(--inner-pad-x); }
 
-  input[type="text"]:focus,
-  input[type="number"]:focus {
-    border-color: #1e90ff;
-    outline: none;
-    box-shadow: 0 0 5px rgba(30, 144, 255, 0.3);
-  }
+    h2 {
+      text-align: center;
+      color: var(--primary);
+      margin: 0 0 var(--space-4);
+      font-size: clamp(20px, 3vw, 28px);
+      font-weight: 700;
+    }
 
-  .error {
-    color: #b00020;
-    font-size: 0.85em;
-    margin-top: 4px;
-    min-height: 18px;
-  }
+    .section-title {
+      color: var(--primary);
+      font-weight: 700;
+      margin-top: var(--space-4);
+      margin-bottom: var(--space-2);
+      border-bottom: 1px solid #e6f2ff;
+      padding-bottom: var(--space-1);
+      font-size: clamp(16px, 2.2vw, 19px);
+    }
 
-  .invalid input {
-    border-color: #b00020;
-    background: #fff5f5;
-  }
+    .field { margin: var(--space-3) 0; }
 
-  .actions {
-    text-align: center;
-    margin-top: 20px;
-  }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: var(--space-1);
+      color: var(--primary);
+    }
 
-  button {
-    background-color: #1e90ff;
-    color: #fff;
-    border: none;
-    padding: 12px 20px;
-    font-size: 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-  }
+    /* Inputs full-width within inner gutters */
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--steel);
+      border-radius: 8px;
+      font-size: 0.98rem;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+      background: #ffffff;
+      box-sizing: border-box;
+      display: block;
+    }
+    input[type="text"]:focus,
+    input[type="number"]:focus {
+      border-color: var(--primary);
+      outline: none;
+      box-shadow: var(--shadow-focus);
+    }
 
-  button:hover:not([disabled]) {
-    background-color: #4682b4; /* SteelBlue */
-  }
+    .error {
+      color: var(--error);
+      font-size: 0.88em;
+      margin-top: 4px;
+      min-height: 18px; /* avoid layout shift */
+    }
+    .invalid input {
+      border-color: var(--error);
+      background: #fff5f5;
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 0.88em;
+      margin-top: 6px;
+    }
 
-  button[disabled] {
-    background-color: #87cefa; /* LightSkyBlue */
-    cursor: not-allowed;
-  }
+    .inline-note {
+      margin-top: 6px;
+      font-size: 0.88em;
+      color: var(--muted);
+    }
 
-  .status {
-    margin-top: 15px;
-    text-align: center;
-    font-size: 0.95em;
-    color: #333;
-  }
-</style>
+    .actions {
+      text-align: center;
+      margin-top: var(--space-4);
+      padding: 0 var(--inner-pad-x); /* aligns Save button with inputs horizontally */
+    }
+
+    button {
+      background-color: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 10px 16px;
+      font-size: 0.98rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.2s, box-shadow 0.2s, transform 0.05s ease-in-out;
+      touch-action: manipulation;
+      min-height: 40px;
+    }
+    button:hover:not([disabled]) {
+      background-color: var(--primary-700);
+      box-shadow: 0 4px 10px rgba(30, 144, 255, 0.18);
+    }
+    button:active:not([disabled]) { transform: scale(0.985); }
+    button[disabled] {
+      background-color: #87cefa;
+      cursor: not-allowed;
+    }
+
+    .status {
+      margin-top: var(--space-3);
+      text-align: center;
+      font-size: 0.95em;
+      min-height: 20px;
+      padding: 0 var(--inner-pad-x); /* keeps status aligned with inner gutters */
+    }
+
+    /* Device Actions Grid — aligned with inner gutters */
+    .device-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-2);
+      margin-top: var(--space-2);
+      padding: 0 var(--inner-pad-x);
+    }
+
+    .btn-secondary { background-color: var(--secondary); }
+    .btn-secondary:hover:not([disabled]) { background-color: var(--primary-700); }
+
+    .btn-warning { background-color: var(--warn); }
+    .btn-warning:hover:not([disabled]) { background-color: var(--warn-700); }
+
+    .btn-danger { background-color: var(--danger); }
+    .btn-danger:hover:not([disabled]) { background-color: var(--danger-700); }
+
+    /* Responsive tweaks */
+    @media (max-width: 768px) {
+      .container { max-width: 94vw; }
+      form { max-width: 94vw; }
+      .device-actions { grid-template-columns: 1fr; } /* stack buttons */
+      .actions button { width: 100%; }                /* full-width save on mobile */
+      button { min-height: 44px; }                    /* better touch size on mobile */
+    }
+
+    @media (min-width: 1200px) {
+      .container { max-width: 700px; }
+      form { max-width: 560px; }
+    }
+
+    /* Optional dark mode support */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a;
+        --card-bg: #0b203a;
+        --text: #e5e7eb;
+        --muted: #9aa8b4;
+        --steel: #2b4a6b;
+      }
+      form { box-shadow: none; border: 1px solid #1f3b5b; }
+      input[type="text"], input[type="number"] { background: #0d2a4a; color: var(--text); }
+      .invalid input { background: #2a0d13; }
+    }
+  </style>
 </head>
 <body>
-  <h2>Switchbot Bot BLE Gateway Settings</h2>
+  <div class="container">
+    <h2>Switchbot BLE Gateway Settings</h2>
 
-  <form id="settingsForm" novalidate>
-    <div class="field" id="macField">
-      <label for="mac">MAC Address (format XX:XX:XX:XX:XX:XX):</label>
-      <input
-        type="text"
-        id="mac"
-        name="mac"
-        placeholder="AA:BB:CC:DD:EE:FF"
-        required
-        inputmode="latin"
-        autocomplete="off"
-      />
-      <div class="error" id="macError"></div>
-    </div>
+    <form id="settingsForm" novalidate>
+      <div class="form-inner">
+        <div class="section-title">Configuration</div>
 
-    <div class="field" id="portField">
-      <label for="port">Server Port (1–65535):</label>
-      <input
-        type="number"
-        id="port"
-        name="port"
-        min="1"
-        max="65535"
-        required
-        inputmode="numeric"
-        autocomplete="off"
-      />
-      <div class="error" id="portError"></div>
-    </div>
+        <div class="field" id="macField">
+          <label for="mac">MAC Address (format XX:XX:XX:XX:XX:XX):</label>
+          <input
+            type="text"
+            id="mac"
+            name="mac"
+            placeholder="AA:BB:CC:DD:EE:FF"
+            required
+            inputmode="latin"
+            autocomplete="off"
+          />
+          <div class="error" id="macError"></div>
+        </div>
 
-    <div class="field" id="scanTimeField">
-      <label for="scanTime">Scan Time (milliseconds, 1000–20000):</label>
-      <input
-        type="number"
-        id="scanTime"
-        name="scanTime"
-        min="1000"
-        max="20000"
-        step="500"
-        required
-        inputmode="numeric"
-        autocomplete="off"
-      />
-      <div class="error" id="scanTimeError"></div>
-    </div>
+        <div class="field" id="portField">
+          <label for="port">Server Port (1–65535):</label>
+          <input
+            type="number"
+            id="port"
+            name="port"
+            min="1"
+            max="65535"
+            required
+            inputmode="numeric"
+            autocomplete="off"
+          />
+          <div class="error" id="portError"></div>
+        </div>
 
-    <div class="field">
-      <label>
-        <input type="checkbox" id="webSerial" name="webSerial" />
-        Enable WebSerial
-      </label>
-    </div>
+        <div class="field" id="scanTimeField">
+          <label for="scanTime">Scan Time (milliseconds, 3000–20000):</label>
+          <input
+            type="number"
+            id="scanTime"
+            name="scanTime"
+            min="3000"
+            max="20000"
+            step="1000"
+            required
+            inputmode="numeric"
+            autocomplete="off"
+          />
+          <div class="error" id="scanTimeError"></div>
+        </div>
 
-    <div class="actions">
-      <button type="submit" id="saveBtn" disabled>Save Settings</button>
-    </div>
+        <!-- BLE Transmission Power (level 0-15, maps to -24..+21 dBm) -->
+        <div class="field" id="bleTxPowerField">
+          <label for="bleTxPower">BLE Transmission Power (level 0–15):</label>
+          <input
+            type="number"
+            id="bleTxPower"
+            name="bleTxPower"
+            min="0"
+            max="15"
+            step="1"
+            placeholder="Enter a level from 0 to 15"
+            required
+            inputmode="numeric"
+            autocomplete="off"
+          />
+          <div class="error" id="bleTxPowerError"></div>
+          <div class="inline-note">
+            Level 0 = −24 dBm, Level 15 = +21 dBm. 
+            <span id="bleTxPreview"></span>
+          </div>
+        </div>
 
-    <div class="status" id="statusMsg" aria-live="polite"></div>
-  </form>
+        <!-- Admin Password (plain text, not masked) — moved after BLE field -->
+        <div class="field" id="adminPasswordField">
+          <label for="adminPassword">Admin Password:</label>
+          <input
+            type="text"
+            id="adminPassword"
+            name="adminPassword"
+            placeholder="Enter admin password"
+            required
+            autocomplete="off"
+          />
+          <div class="error" id="adminPasswordError"></div>
+        </div>
+
+        <div class="field">
+          <label>
+            <input type="checkbox" id="webSerial" name="webSerial" />
+            Enable WebSerial
+          </label>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="submit" id="saveBtn" disabled>Save Settings</button>
+      </div>
+
+      <div class="form-inner">
+        <div class="section-title">Device Actions</div>
+      </div>
+
+      <div class="device-actions">
+        <button type="button" id="btnSafeboot" class="btn-secondary">Safeboot Mode</button>
+        <button type="button" id="btnReset" class="btn-warning">Restart</button>
+        <button type="button" id="btnDecomission" class="btn-danger">Decomission Matter</button>
+        <button type="button" id="btnClear" class="btn-danger">Clear Configuration</button>
+      </div>
+
+      <div class="status" id="statusMsg" aria-live="polite"></div>
+    </form>
+  </div>
 
   <script>
+    // ---------- Validation Rules ----------
     const macPattern = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
 
     function validateMac(value) {
@@ -187,28 +360,61 @@
       if (value === "" || value === null) return "Scan time is required.";
       const n = Number(value);
       if (!Number.isInteger(n)) return "Scan time must be an integer.";
-      if (n < 1000) return "Scan time must be at least 1000 .";
+      if (n < 3000) return "Scan time must be greater than 3000.";
       if (n > 20000) return "Scan time cannot exceed 20000 ms.";
       return "";
     }
 
+    function validateBleLevel(value) {
+      if (value === "" || value === null) return "Server port is required.";
+      const n = Number(value);
+      if (!Number.isInteger(n)) return "Power Level must be an integer.";
+      if (n < 0 || n > 15) return "Level must be between 0 and 15.";
+      return "";
+    }
+
+    function validateAdminPassword(value) {
+      if (!value || !value.trim()) return "Admin password is required.";
+      return "";
+    }
+
+    function bleLevelToDbm(level) {
+      return -24 + (level * 3);
+    }
+
+    // ---------- DOM Elements ----------
     const form = document.getElementById("settingsForm");
     const macInput = document.getElementById("mac");
     const portInput = document.getElementById("port");
     const scanTimeInput = document.getElementById("scanTime");
+    const bleTxPowerInput = document.getElementById("bleTxPower");
+    const adminPasswordInput = document.getElementById("adminPassword");
     const webSerialInput = document.getElementById("webSerial");
 
     const macError = document.getElementById("macError");
     const portError = document.getElementById("portError");
     const scanTimeError = document.getElementById("scanTimeError");
+    const bleTxPowerError = document.getElementById("bleTxPowerError");
+    const adminPasswordError = document.getElementById("adminPasswordError");
 
     const macField = document.getElementById("macField");
     const portField = document.getElementById("portField");
     const scanTimeField = document.getElementById("scanTimeField");
+    const bleTxPowerField = document.getElementById("bleTxPowerField");
+    const adminPasswordField = document.getElementById("adminPasswordField");
 
     const saveBtn = document.getElementById("saveBtn");
     const statusMsg = document.getElementById("statusMsg");
 
+    const bleTxPreview = document.getElementById("bleTxPreview");
+
+    // Device action buttons
+    const btnSafeboot = document.getElementById("btnSafeboot");
+    const btnReset = document.getElementById("btnReset");
+    const btnDecomission = document.getElementById("btnDecomission");
+    const btnClear = document.getElementById("btnClear");
+
+    // ---------- Helpers ----------
     function setFieldValidity(fieldEl, errorEl, errorText) {
       if (errorText) {
         fieldEl.classList.add("invalid");
@@ -219,22 +425,49 @@
       }
     }
 
+    function validateBleLevel(value) {
+      if (value === "" || value === null) return "Server port is required.";
+      const n = Number(value);
+      if (!Number.isInteger(n)) return "Power Level must be an integer.";
+      if (n < 0 || n > 15) return "Level must be between 0 and 15.";
+      return "";
+    }
+
+    function updateBlePreview() {
+      const p = Number(bleTxPowerInput.value);
+      if (p && p >= 0 && p <= 15) {
+        const dbm = bleLevelToDbm(p);
+        bleTxPreview.textContent = ` — Current: ${p} ⇒ ${dbm} dBm`;
+      } else {
+        bleTxPreview.textContent = "";
+      }
+    }
+
     function validateAll() {
       const macErr = validateMac(macInput.value);
       const portErr = validatePort(portInput.value);
       const scanErr = validateScanTime(scanTimeInput.value);
+      const bleErr = validateBleLevel(bleTxPowerInput.value);
+      const adminPwdErr = validateAdminPassword(adminPasswordInput.value);
 
       setFieldValidity(macField, macError, macErr);
       setFieldValidity(portField, portError, portErr);
       setFieldValidity(scanTimeField, scanTimeError, scanErr);
+      setFieldValidity(bleTxPowerField, bleTxPowerError, bleErr);
+      setFieldValidity(adminPasswordField, adminPasswordError, adminPwdErr);
 
+      // HTML constraint validity (BLE is text, relies on required)
       const htmlValid =
         macInput.checkValidity() &&
         portInput.checkValidity() &&
-        scanTimeInput.checkValidity();
+        scanTimeInput.checkValidity() &&
+        bleTxPowerInput.checkValidity() &&
+        adminPasswordInput.checkValidity();
 
-      const allValid = !macErr && !portErr && !scanErr && htmlValid;
+      const allValid = !macErr && !portErr && !scanErr && !bleErr && !adminPwdErr && htmlValid;
       saveBtn.disabled = !allValid;
+
+      updateBlePreview();
       return allValid;
     }
 
@@ -245,25 +478,32 @@
         t = setTimeout(() => fn.apply(this, args), delay);
       };
     }
-
     const validateAllDebounced = debounce(validateAll, 120);
 
+    // ---------- Live Validation ----------
     macInput.addEventListener("input", validateAllDebounced);
     portInput.addEventListener("input", validateAllDebounced);
     scanTimeInput.addEventListener("input", validateAllDebounced);
+    bleTxPowerInput.addEventListener("input", validateAllDebounced);
+    adminPasswordInput.addEventListener("input", validateAllDebounced);
 
     macInput.addEventListener("blur", validateAll);
     portInput.addEventListener("blur", validateAll);
     scanTimeInput.addEventListener("blur", validateAll);
+    bleTxPowerInput.addEventListener("blur", validateAll);
+    adminPasswordInput.addEventListener("blur", validateAll);
 
+    // ---------- Initial Load (POST) ----------
     document.addEventListener("DOMContentLoaded", () => {
       statusMsg.textContent = "Loading settings…";
       fetch("/admin/settings")
         .then((res) => res.ok ? res.json() : Promise.reject(res))
         .then((data) => {
           macInput.value = data.ble_mac ?? "";
-          portInput.value = data.web_port ?? 3000;
-          scanTimeInput.value = data.scan_time ?? 1000;
+          portInput.value = data.web_port ?? 80;
+          scanTimeInput.value = data.scan_time ?? 3000;
+          bleTxPowerInput.value = data.ble_power ?? 11;
+          adminPasswordInput.value = data.admin_pass ?? "";
           webSerialInput.checked = !!data.webserial_on;
 
           validateAll();
@@ -276,6 +516,7 @@
         });
     });
 
+    // ---------- Submit Settings (POST) ----------
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       const ok = validateAll();
@@ -288,6 +529,8 @@
         ble_mac: macInput.value.trim(),
         web_port: Number(portInput.value),
         scan_time: Number(scanTimeInput.value),
+        ble_power: Number(bleTxPowerInput.value),
+        admin_pass: adminPasswordInput.value,
         webserial_on: webSerialInput.checked
       };
 
@@ -311,6 +554,54 @@
           validateAll();
         });
     });
+
+    // ---------- Device Actions (GET) ----------
+    async function getAction(url, label, confirmText = null) {
+      if (confirmText && !window.confirm(confirmText)) return;
+
+      statusMsg.textContent = `${label}…`;
+      const allButtons = [btnSafeboot, btnReset, btnDecomission, btnClear];
+      allButtons.forEach(b => b.disabled = true);
+
+      try {
+        const res = await fetch(url, { method: "GET" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        // Try to read text or JSON; tolerate empty body
+        let msg = "";
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          await res.json().catch(() => ({}));
+        } else {
+          msg = await res.text().catch(() => "");
+        }
+        statusMsg.textContent = `${label} request sent successfully.${msg ? " " + msg : ""}`;
+      } catch (err) {
+        console.error(`Error during ${label}:`, err);
+        statusMsg.textContent = `Failed to perform ${label.toLowerCase()}.`;
+      } finally {
+        allButtons.forEach(b => b.disabled = false);
+      }
+    }
+
+    btnSafeboot.addEventListener("click", () =>
+      getAction("/admin/safeboot", "Safeboot Mode", "Are you sure you want to run the device in Safeboot Mode now?")
+    );
+
+    btnReset.addEventListener("click", () =>
+      getAction("/admin/restart", "Restart", "Are you sure you want to restart the device now?")
+    );
+
+    btnDecomission.addEventListener("click", () =>
+      getAction("/admin/decomission", "Decomission Matter",
+        "This will decommission Matter. Continue?")
+    );
+
+    btnClear.addEventListener("click", () =>
+      getAction("/admin/clear", "Clear Configuration",
+        "This will clear the configuration. This action cannot be undone. Proceed?")
+    );
   </script>
 </body>
 </html>
+
