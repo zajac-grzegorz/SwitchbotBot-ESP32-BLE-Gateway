@@ -58,14 +58,6 @@ class ClientCallbacks : public NimBLEClientCallbacks
         // LED_STATUS_UPDATE(start(LED_AP_CONNECTED));
     }
 
-    void onConnectFail(NimBLEClient* pClient, int reason) override
-    {
-        logger.info(RE_TAG, "BLE connection failed");
-        
-        LED_COLOR_UPDATE(LED_COLOR_RED);
-        LED_STATUS_UPDATE(start(LED_BLE_ALERT));
-    }
-
     void onDisconnect(NimBLEClient *pClient, int reason) override
     {
         uint64_t tm = millis() - conTimeout;
@@ -697,7 +689,10 @@ void loop()
         {
             logger.error(RE_TAG, "Failed to connect");
 
-            offMatterSwitchTask.resume(10000);
+            LED_COLOR_UPDATE(LED_COLOR_RED);
+            LED_STATUS_UPDATE(start(LED_BLE_ALERT));
+
+            offMatterSwitchTask.resume(5000);
 
             if (auto request = pressRequest.lock()) 
             {
