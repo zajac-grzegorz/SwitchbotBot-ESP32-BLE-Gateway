@@ -12,12 +12,12 @@
 #include "ReBLEConfig.h"
 #include "ReLED.h"
 
-static AsyncWebServer server(webServerPort);
+static AsyncWebServer* server;
 static AsyncWebServerRequestPtr pressRequest;
 // basicAuth
 static AsyncAuthenticationMiddleware basicAuth;
 
-static Mycila::ESPConnect espConnect(server);
+static Mycila::ESPConnect* espConnect;
 
 static const NimBLEAdvertisedDevice* advDevice = nullptr;
 static NimBLEScan* pScan = nullptr;
@@ -86,8 +86,6 @@ class ScanCallbacks : public NimBLEScanCallbacks
 
             LED_COLOR_UPDATE(LED_COLOR_GREEN);
             LED_STATUS_UPDATE(on());
-            
-            // doConnect = true;
         }
     }
 
@@ -421,9 +419,13 @@ void setup()
     // load configuration data from NVS
     configureStorage();
 
+    server = new AsyncWebServer(config.get<int>("web_port"));
+    espConnect = new Mycila::ESPConnect(*server);
+
     // basic authentication
     basicAuth.setUsername("admin");
-    basicAuth.setPassword("admin");
+    // basicAuth.setPassword("admin");
+    basicAuth.setPassword(config.getString("admin_pass"));
     basicAuth.setRealm("MyApp");
     basicAuth.setAuthFailureMessage("Authentication failed");
     basicAuth.setAuthType(AsyncAuthType::AUTH_BASIC);
@@ -437,7 +439,7 @@ void setup()
     });
 
     // network state listener
-    espConnect.listen([](__unused Mycila::ESPConnect::State previous, __unused Mycila::ESPConnect::State state) 
+    espConnect->listen([](__unused Mycila::ESPConnect::State previous, __unused Mycila::ESPConnect::State state) 
     {
         switch (state)
         {
@@ -457,41 +459,41 @@ void setup()
         }
 
         JsonDocument doc;
-        espConnect.toJson(doc.to<JsonObject>());
+        espConnect->toJson(doc.to<JsonObject>());
         serializeJsonPretty(doc, Serial);
         Serial.println();
     });
 
-    espConnect.setAutoRestart(true);
-    espConnect.setBlocking(true);
+    espConnect->setAutoRestart(true);
+    espConnect->setBlocking(true);
     logger.debug(RE_TAG, "Trying to connect to saved WiFi or will start portal...");
-    espConnect.begin("BLEGateway", "BLEGateway");
+    espConnect->begin("BLEGateway", "BLEGateway");
     logger.debug(RE_TAG, "ESPConnect completed, continuing setup()...");
 
     // serve your home page here
-    server.on("/", handleRoot).setFilter([](__unused AsyncWebServerRequest* request) 
+    server->on("/", handleRoot).setFilter([](__unused AsyncWebServerRequest* request) 
     { 
-        return espConnect.getState() != Mycila::ESPConnect::State::PORTAL_STARTED; 
+        return espConnect->getState() != Mycila::ESPConnect::State::PORTAL_STARTED; 
     });
     
     // clear persisted config
-    server.on("/admin/clear", HTTP_GET, [&](AsyncWebServerRequest* request) 
+    server->on("/admin/clear", HTTP_GET, [&](AsyncWebServerRequest* request) 
     {
-        espConnect.clearConfiguration();
+        espConnect->clearConfiguration();
+        config.clear();
         request->send(200);
         ESP.restart();
     }).addMiddleware(&basicAuth);
 
-    server.on(AsyncURIMatcher::exact("/admin"), HTTP_GET, [&](AsyncWebServerRequest* request) 
+    server->on(AsyncURIMatcher::exact("/admin"), HTTP_GET, [&](AsyncWebServerRequest* request) 
     {
         AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (uint8_t*)(update_html_start), update_html_end - update_html_start);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
-        // server.send_P(200, "text/html", reinterpret_cast<const char*>(update_html_start), update_html_end - update_html_start);
-    });
+    }).addMiddleware(&basicAuth);
 
     // get stored admin settings
-    server.on(AsyncURIMatcher::exact("/admin/settings"), HTTP_GET, [&](AsyncWebServerRequest* request) 
+    server->on(AsyncURIMatcher::exact("/admin/settings"), HTTP_GET, [&](AsyncWebServerRequest* request) 
     {
         AsyncJsonResponse *response = new AsyncJsonResponse();
         JsonObject doc = response->getRoot().to<JsonObject>();
@@ -504,10 +506,10 @@ void setup()
         
         response->setLength();
         request->send(response);
-    });
+    }).addMiddleware(&basicAuth);
 
      // store new admin settings
-    server.on(AsyncURIMatcher::exact("/admin/settings"), HTTP_POST, [&](AsyncWebServerRequest* request, JsonVariant &json) 
+    server->on(AsyncURIMatcher::exact("/admin/settings"), HTTP_POST, [&](AsyncWebServerRequest* request, JsonVariant &json) 
     {
         JsonObject doc = json.as<JsonObject>();
 
@@ -521,9 +523,9 @@ void setup()
         serializeJson(doc, Serial);
 
         request->send(200, "application/json", "{}");
-    });
+    }).addMiddleware(&basicAuth);
 
-    server.on("/heap", HTTP_GET, [](AsyncWebServerRequest *request)
+    server->on("/heap", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         JsonDocument doc;
         doc["Heap_size"] = ESP.getHeapSize();
@@ -536,33 +538,33 @@ void setup()
         request->send(200, "application/json", output);
     });
 
-    server.on("/admin/restart", HTTP_GET, [](AsyncWebServerRequest *request)
+    server->on("/admin/restart", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         request->send(200, "text/plain", "Device has been restarted");
         ESP.restart();
     }).addMiddleware(&basicAuth);
 
-    server.on("/admin/safeboot", HTTP_GET, [](AsyncWebServerRequest *request)
-    {
-        request->send(200, "text/html", "<form method='POST' action='/admin/safeboot' enctype='multipart/form-data'><input type='submit' value='Restart in SafeBoot mode'></form>");
-    }).addMiddleware(&basicAuth);
+    // server->on("/admin/safeboot", HTTP_GET, [](AsyncWebServerRequest *request)
+    // {
+    //     request->send(200, "text/html", "<form method='POST' action='/admin/safeboot' enctype='multipart/form-data'><input type='submit' value='Restart in SafeBoot mode'></form>");
+    // }).addMiddleware(&basicAuth);
 
-    server.on("/admin/safeboot", HTTP_POST, [](AsyncWebServerRequest *request)
+    server->on("/admin/safeboot", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         request->send(200, "text/plain", "Restarting in SafeBoot mode...");
         Mycila::System::restartFactory("safeboot", 1000);
     }).addMiddleware(&basicAuth);
 
-    server.on("/admin/decomission", HTTP_GET, [](AsyncWebServerRequest *request)
+    server->on("/admin/decomission", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         logger.debug(RE_TAG, "Decommissioning the Plugin Matter Accessory. It shall be commissioned again");
         OnOffPlugin.setOnOff(false);
         Matter.decommission();
 
         request->send(200, "text/plain", "Decommissioning the Matter Accessory. It shall be commissioned again");
-    }).addMiddleware(&basicAuth);;
+    }).addMiddleware(&basicAuth);
 
-    server.on("/switchbot/press", HTTP_GET, [](AsyncWebServerRequest *request)
+    server->on("/switchbot/press", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         doCommand = "570100";
 
@@ -577,7 +579,7 @@ void setup()
         }
     });
 
-    server.on("/switchbot/press", HTTP_POST, [](AsyncWebServerRequest *request)
+    server->on("/switchbot/press", HTTP_POST, [](AsyncWebServerRequest *request)
     {
         doCommand = "570100";
 
@@ -592,7 +594,7 @@ void setup()
         }
     });
 
-    server.on("/switchbot/command", HTTP_GET, [](AsyncWebServerRequest *request)
+    server->on("/switchbot/command", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         String code;
 
@@ -618,18 +620,20 @@ void setup()
     });
 
 
-    server.onNotFound(handleNotFound);
-    server.begin();
+    server->onNotFound(handleNotFound);
+    server->begin();
 
     // To allow log viewing over the web
-    configureWebSerial(false, &server);
+    configureWebSerial(false, server);
 
     logger.debug(RE_TAG, "Async Web Server started");
 
     /** Initialize NimBLE and set the device name */
     NimBLEDevice::init("SwitchBot-Bot-Client");
     NimBLEDevice::whiteListAdd(NimBLEAddress(config.getString("ble_mac"), 0));
-    NimBLEDevice::setPower(ESP_PWR_LVL_P9); /** +9dbm */
+    NimBLEDevice::setPower((esp_power_level_t) config.get<int>("ble_power"));
+    
+    logger.debug(RE_TAG, "BLE power Tx level: %ld", config.get<int>("ble_power"));
 
     pScan = NimBLEDevice::getScan();
 
@@ -674,7 +678,7 @@ void setup()
 
 void loop()
 {
-    espConnect.loop();
+    espConnect->loop();
     offMatterSwitchTask.tryRun();
     
     if (doConnect)

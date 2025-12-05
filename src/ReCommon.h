@@ -33,7 +33,7 @@ void configureStorage()
    config.begin("BLEGateway", true); // Preload all values
 }
 
-void configureWebSerial(bool enabled, AsyncWebServer* server)
+void configureWebSerial(bool enabled, const AsyncWebServer* server)
 {
    if (enabled)
    {
@@ -41,7 +41,7 @@ void configureWebSerial(bool enabled, AsyncWebServer* server)
       {
          webSerial = new WebSerial();
          webSerial->setBuffer(128);
-         webSerial->begin(server);
+         webSerial->begin(const_cast<AsyncWebServer*> (server));
          logger.forwardTo(webSerial);
 
          logger.debug(RE_TAG, "Using WebSerial logger");
