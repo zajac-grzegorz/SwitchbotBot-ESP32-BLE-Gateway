@@ -578,9 +578,15 @@
         statusMsg.textContent = `${label} request sent successfully.${msg ? " " + msg : ""}`;
       } catch (err) {
         console.error(`Error during ${label}:`, err);
-        statusMsg.textContent = `Failed to perform ${label.toLowerCase()}.`;
+        // statusMsg.textContent = `Failed to perform ${label.toLowerCase()}.`;
       } finally {
         allButtons.forEach(b => b.disabled = false);
+        statusMsg.textContent = `${label} request sent successfully.`;
+        
+        // location replace in 10 seconds
+        setTimeout(function() {
+          window.location.replace("/");
+        }, 10000);
       }
     }
 

@@ -482,6 +482,7 @@ void setup()
         espConnect->clearConfiguration();
         config.clear();
         request->send(200);
+        
         ESP.restart();
     }).addMiddleware(&basicAuth);
 

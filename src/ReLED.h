@@ -12,7 +12,7 @@
 #define LED_BLE_SCANNING        1000                // medium flashing
 #define LED_BLE_ALERT           500                 
 #define LED_BLE_PROCESSING      500,0.5,2,200
-#define LED_BLE_IDLE            5000,0.5,2,0
+#define LED_BLE_IDLE            2500,1,1,2500
 
 #define LED_COLOR_RED           100,0,0
 #define LED_COLOR_GREEN         0,100,0
