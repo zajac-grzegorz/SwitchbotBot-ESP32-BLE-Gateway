@@ -402,10 +402,17 @@ void setup()
     ReLED.begin(PIN_RGB_LED, true, 0);
 #else
 
-#ifdef USB_PRODUCT && USB_PRODUCT == "NanoC6"
-    pinMode(RGB_LED_PWR_PIN, OUTPUT);
-    digitalWrite(RGB_LED_PWR_PIN, HIGH);
-    ReLED.begin(RGB_LED_DATA_PIN, true, 0);
+#ifdef USB_PRODUCT 
+    if (String(USB_PRODUCT) == "NanoC6")
+    {
+        pinMode(RGB_LED_PWR_PIN, OUTPUT);
+        digitalWrite(RGB_LED_PWR_PIN, HIGH);
+        ReLED.begin(RGB_LED_DATA_PIN, true, 0);
+    }
+    else
+    {
+        ReLED.begin(LED_BUILTIN, false, 0);
+    }
 #else
     ReLED.begin(LED_BUILTIN, false, 0);
 #endif
