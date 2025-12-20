@@ -399,7 +399,7 @@ void setup()
 
     // Configure RGB led or normal led, depending on the board type
 #ifdef PIN_RGB_LED
-    ReLED.begin(PIN_RGB_LED, true, 0);
+    ReLED.begin(PIN_RGB_LED, true, 300);
 #else
 
 #ifdef USB_PRODUCT 
@@ -407,14 +407,14 @@ void setup()
     {
         pinMode(RGB_LED_PWR_PIN, OUTPUT);
         digitalWrite(RGB_LED_PWR_PIN, HIGH);
-        ReLED.begin(RGB_LED_DATA_PIN, true, 0);
+        ReLED.begin(RGB_LED_DATA_PIN, true, 300);
     }
     else
     {
-        ReLED.begin(LED_BUILTIN, false, 0);
+        ReLED.begin(LED_BUILTIN, false, 300);
     }
 #else
-    ReLED.begin(LED_BUILTIN, false, 0);
+    ReLED.begin(LED_BUILTIN, false, 300);
 #endif
 
 #endif    
@@ -688,6 +688,7 @@ void loop()
 {
     espConnect->loop();
     offMatterSwitchTask.tryRun();
+    ReLED.getStatusLED()->check();
     
     if (doConnect)
     {
