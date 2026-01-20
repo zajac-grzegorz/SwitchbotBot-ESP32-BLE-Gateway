@@ -472,6 +472,7 @@ void setup()
     });
 
     espConnect->setAutoRestart(true);
+    espConnect->setConnectTimeout(300);
     espConnect->setBlocking(true);
     logger.debug(RE_TAG, "Trying to connect to saved WiFi or will start portal...");
     espConnect->begin("BLEGateway", "BLEGateway");
