@@ -74,6 +74,9 @@ class ScanCallbacks : public NimBLEScanCallbacks
     {
         // This is a device with our MAC address
         std::string botMacAddr = config.getString("ble_mac");
+        // Convert to lowercase because NimBLE returns mac address in lowercase
+        std::transform(botMacAddr.begin(), botMacAddr.end(), botMacAddr.begin(), ::tolower);
+
         if (advertisedDevice->getAddress().toString() == botMacAddr)
         {
             logger.info(RE_TAG, "Advertised Device found: %s", advertisedDevice->getAddress().toString().c_str());
@@ -633,7 +636,7 @@ void setup()
     server->begin();
 
     // To allow log viewing over the web
-    configureWebSerial(false, server);
+    configureWebSerial(config.get<bool>("webserial_on"), server);
 
     logger.debug(RE_TAG, "Async Web Server started");
 

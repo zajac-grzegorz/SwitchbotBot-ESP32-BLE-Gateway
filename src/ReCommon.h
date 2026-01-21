@@ -24,7 +24,7 @@ void configureStorage()
    // Declare configuration keys with optional default values
    // Key names must be ≤ 15 characters
    config.configure("webserial_on", false);
-   config.configure("ble_mac", "d8:bf:c4:c6:51:0c");
+   config.configure("ble_mac", "f2:b2:02:06:1d:21");
    config.configure("web_port", 80);
    config.configure("scan_time", 5000);
    config.configure("ble_power", 11);
