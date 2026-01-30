@@ -7,10 +7,13 @@
 #include <MycilaSystem.h>
 #include <MycilaTaskManager.h>
 #include <MycilaWebSerial.h>
+#include <PsychicMqttClient.h>
 #include "ReCommon.h"
 #include "ReBLEUtils.h"
 #include "ReBLEConfig.h"
 #include "ReLED.h"
+
+static PsychicMqttClient mqttClient;
 
 static AsyncWebServer* server;
 static AsyncWebServerRequestPtr pressRequest;
@@ -683,6 +686,22 @@ void setup()
     /** Start scanning for advertisers */ // move this to matter event handler?
     int scanTimeMs = config.get<int>("scan_time");
     pScan->start(scanTimeMs);
+
+    mqttClient.setServer("mqtt://192.168.68.100:1883");
+    mqttClient.setCredentials("reapartment", "reapartment");
+    mqttClient.setCleanSession(false);
+    mqttClient.setKeepAlive(60);
+    mqttClient.setWill("blegateway/status", 1, true, "BLEGateway OFFLINE");
+
+    mqttClient.connect();
+
+    while (!mqttClient.connected())
+    {
+        delay(500);
+    }
+    mqttClient.publish("blegateway/status", 1, true, "BLEGateway: ONLINE");
+    // logger.debug(RE_TAG, "MQTT connected: %s", mqttClient.connected() ? "YES" : "NO");
+    // logger.debug(RE_TAG, "MQTT clientID: %s", mqttClient.getClientId());
 
     LED_COLOR_UPDATE(LED_COLOR_GREEN);
     LED_STATUS_UPDATE(start(LED_BLE_SCANNING));
