@@ -120,7 +120,14 @@ void Blinker::off(){
     return;
 
   stop();
+
+// for XIAO-ESP32S3 off LED is when pin set to high
+#ifdef ARDUINO_XIAO_ESP32S3
+  led->on();
+#else
   led->off();
+#endif
+  
   status=STATUS::OFF;
 }
 
