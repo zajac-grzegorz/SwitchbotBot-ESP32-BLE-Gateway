@@ -10,6 +10,8 @@
 #define RETAG(a, b) a ":" RELINE(b)
 #define RE_TAG RETAG(__FILE__, __LINE__)
 
+#define RE_TASK_RESUME_TIME_MS 5000
+
 extern const uint8_t update_html_start[] asm("_binary__pio_embed_settings_html_gz_start");
 extern const uint8_t update_html_end[] asm("_binary__pio_embed_settings_html_gz_end");
 

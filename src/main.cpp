@@ -134,7 +134,7 @@ void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData,
         request->send(200, "application/json", output);
     } 
 
-    offMatterSwitchTask.resume(10000);
+    offMatterSwitchTask.resume(RE_TASK_RESUME_TIME_MS);
 }
 
 /** Handles the provisioning of clients and connects / interfaces with the server */
@@ -712,7 +712,7 @@ void loop()
             LED_COLOR_UPDATE(LED_COLOR_RED);
             LED_STATUS_UPDATE(start(LED_BLE_ALERT));
 
-            offMatterSwitchTask.resume(5000);
+            offMatterSwitchTask.resume(RE_TASK_RESUME_TIME_MS);
 
             if (auto request = pressRequest.lock()) 
             {
