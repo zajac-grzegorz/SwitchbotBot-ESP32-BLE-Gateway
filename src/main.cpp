@@ -689,19 +689,26 @@ void setup()
 
     mqttClient.setServer("mqtt://192.168.68.100:1883");
     mqttClient.setCredentials("reapartment", "reapartment");
+    mqttClient.setClientId("BLEGateway");
     mqttClient.setCleanSession(false);
     mqttClient.setKeepAlive(60);
     mqttClient.setWill("blegateway/status", 1, true, "BLEGateway OFFLINE");
 
-    mqttClient.connect();
-
-    while (!mqttClient.connected())
+    mqttClient.onTopic("blegateway/control", 2, [&](const char *topic, const char *payload, int retain, int qos, bool dup) 
     {
-        delay(500);
-    }
-    mqttClient.publish("blegateway/status", 1, true, "BLEGateway: ONLINE");
-    // logger.debug(RE_TAG, "MQTT connected: %s", mqttClient.connected() ? "YES" : "NO");
-    // logger.debug(RE_TAG, "MQTT clientID: %s", mqttClient.getClientId());
+        logger.debug(RE_TAG, "Received Topic: %s", topic);
+        logger.debug(RE_TAG, "Received Payload: %s", payload); 
+    });
+
+    mqttClient.onConnect([](bool sessionPresent) {
+        logger.debug(RE_TAG, "MQTT connected: %s, sessionPresent: %d", 
+            mqttClient.connected() ? "YES" : "NO", sessionPresent);
+        logger.debug(RE_TAG, "MQTT clientID: %s", mqttClient.getClientId());
+        
+        mqttClient.publish("blegateway/status", 1, true, "BLEGateway: ONLINE");
+    });
+
+    mqttClient.connect();
 
     LED_COLOR_UPDATE(LED_COLOR_GREEN);
     LED_STATUS_UPDATE(start(LED_BLE_SCANNING));
