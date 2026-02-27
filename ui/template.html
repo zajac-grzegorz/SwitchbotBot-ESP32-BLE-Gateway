@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{{TITLE}}</title>
+
+  <!-- The generator will place a <style>...</style> block here -->
+  {{INLINE_CSS}}
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>{{TITLE}}</h1>
+      <div class="cluster">
+        <div class="nav" id="tabs"></div>
+        <button id="themeToggle" class="btn outline" title="Toggle theme">Theme</button>
+      </div>
+    </div>
+
+    <div id="pages"></div>
+
+    <div class="card">
+      <div class="btn-row" id="defaultButtons"></div>
+      <div class="footer">UI generated for ESP32 <span class="badge">responsive</span></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- The generator will inject the inline schema here -->
+  {{SCHEMA_INLINE}}
+
+  <!-- The generator will place a <script>...</script> block here -->
+  {{INLINE_JS}}
+</body>
+
+</html>

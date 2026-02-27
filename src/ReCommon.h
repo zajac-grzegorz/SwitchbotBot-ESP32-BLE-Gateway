@@ -12,8 +12,10 @@
 
 #define RE_TASK_RESUME_TIME_MS 5000
 
-extern const uint8_t update_html_start[] asm("_binary__pio_embed_settings_html_gz_start");
-extern const uint8_t update_html_end[] asm("_binary__pio_embed_settings_html_gz_end");
+extern const uint8_t settings_html_start[] asm("_binary__pio_embed_settings_html_gz_start");
+extern const uint8_t settings_html_end[] asm("_binary__pio_embed_settings_html_gz_end");
+extern const uint8_t main_html_start[] asm("_binary__pio_embed_main_html_gz_start");
+extern const uint8_t main_html_end[] asm("_binary__pio_embed_main_html_gz_end");
 
 inline Mycila::config::NVS storage;
 inline Mycila::config::Config config(storage);

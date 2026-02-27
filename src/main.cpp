@@ -502,7 +502,14 @@ void setup()
 
     server->on(AsyncURIMatcher::exact("/admin"), HTTP_GET, [&](AsyncWebServerRequest* request) 
     {
-        AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (uint8_t*)(update_html_start), update_html_end - update_html_start);
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (uint8_t*)(settings_html_start), settings_html_end - settings_html_start);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    }).addMiddleware(&basicAuth);
+
+    server->on(AsyncURIMatcher::exact("/main"), HTTP_GET, [&](AsyncWebServerRequest* request) 
+    {
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (uint8_t*)(main_html_start), main_html_end - main_html_start);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     }).addMiddleware(&basicAuth);
