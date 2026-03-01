@@ -3,6 +3,7 @@
   "theme": {
     "accent": "#20a4a9"
   },
+  "endpoint": "/admin/config",
   "pages": [
     {
       "id": "network",

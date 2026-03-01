@@ -10,8 +10,8 @@ os.makedirs(".pio/embed", exist_ok=True)
 for filename in ["settings.html", "main.html"]:
     skip = False
     # comment out next two lines to always rebuild
-    if os.path.isfile(".pio/embed/" + filename + ".gz"):
-        skip = True
+    #if os.path.isfile(".pio/embed/" + filename + ".gz"):
+    #    skip = True
 
     if skip:
         sys.stderr.write(f"website.py: {filename}.gz already available\n")

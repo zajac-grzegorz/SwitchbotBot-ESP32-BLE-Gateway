@@ -295,8 +295,9 @@
 
   async function loadDefaults() {
     try {
-      const res = await fetch('/config', { method: 'GET', headers: { 'Accept': 'application/json' } });
-      if (!res.ok) throw new Error('GET /config failed');
+      const endpoint = window._schema.endpoint || '/config';
+      const res = await fetch(endpoint, { method: 'GET', headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error(`GET ${endpoint} failed`);
       const data = await res.json();
       applyData(window._schema, data);
       showToast('Configuration loaded');
@@ -331,12 +332,13 @@
     const payload = collectData(window._schema);
 
     try {
-      const res = await fetch('/config', {
+      const endpoint = window._schema.endpoint || '/config';
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (!res.ok) throw new Error('POST /config failed');
+      if (!res.ok) throw new Error(`POST ${endpoint} failed`);
       showToast('Configuration saved');
     } catch (e) {
       showToast('Save failed');
