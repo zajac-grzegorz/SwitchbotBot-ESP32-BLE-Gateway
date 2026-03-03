@@ -33,28 +33,48 @@
           "fields": [
             {
               "type": "number",
-              "name": "network.port_web",
+              "name": "device.port_web",
               "label": "Web Server Port",
               "validator": "port",
               "default": 80,
               "min": 1,
               "max": 65535
+            }
+          ]
+        },
+        {
+          "legend": "MQTT",
+          "fields": [
+            {
+              "type": "checkbox",
+              "name": "mqtt.enable",
+              "label": "Enable MQTT"
             },
             {
               "type": "text",
-              "name": "network.mqtt_ip",
+              "name": "mqtt.ip",
               "label": "MQTT IP Address",
               "validator": "ip",
               "placeholder": "192.168.1.10"
             },
             {
               "type": "number",
-              "name": "network.port_mqtt",
+              "name": "mqtt.port",
               "label": "MQTT Port",
               "validator": "port",
               "default": 1883,
               "min": 1,
               "max": 65535
+            },
+            {
+              "type": "text",
+              "name": "mqtt.username",
+              "label": "Username"
+            },
+            {
+              "type": "password",
+              "name": "mqtt.password",
+              "label": "Password"
             }
           ]
         }
@@ -146,28 +166,28 @@
         {
           "label": "Safeboot Mode",
           "method": "POST",
-          "endpoint": "/reboot",
+          "endpoint": "/admin/safeboot",
           "confirm": "Are you sure you want to run the device in Safeboot Mode now?",
           "includeForm": false
         },
         {
           "label": "Restart",
           "method": "POST",
-          "endpoint": "/factory_reset",
+          "endpoint": "/admin/restart",
           "confirm": "Are you sure you want to restart the device now?",
           "includeForm": false
         },
         {
           "label": "Decomission Matter",
           "method": "POST",
-          "endpoint": "/factory_reset",
+          "endpoint": "/admin/decomission",
           "confirm": "This will decomission Matter, continue?",
           "includeForm": false
         },
         {
           "label": "Clear Configuration",
           "method": "POST",
-          "endpoint": "/factory_reset",
+          "endpoint": "/admin/clear",
           "confirm": "This will clear the configuration. This action cannot be undone. Proceed?",
           "includeForm": false
         }

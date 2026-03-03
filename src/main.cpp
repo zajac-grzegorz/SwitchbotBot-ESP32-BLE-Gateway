@@ -530,6 +530,22 @@ void setup()
         request->send(response);
     }).addMiddleware(&basicAuth);
 
+    // get stored admin settings
+    server->on(AsyncURIMatcher::exact("/admin/config"), HTTP_GET, [&](AsyncWebServerRequest* request) 
+    {
+        AsyncJsonResponse *response = new AsyncJsonResponse();
+        JsonObject doc = response->getRoot().to<JsonObject>();
+        doc["bot"]["mac"] = config.getString("ble_mac");
+        doc["device"]["port_web"] = config.get<int>("web_port");
+        doc["bot"]["scantime"] = config.get<int>("scan_time");
+        doc["bot"]["txpower"] = config.get<int>("ble_power");
+        doc["admin"]["password"] = config.getString("admin_pass");
+        doc["admin"]["webserial"] = config.get<bool>("webserial_on");
+        
+        response->setLength();
+        request->send(response);
+    }).addMiddleware(&basicAuth);
+
      // store new admin settings
     server->on(AsyncURIMatcher::exact("/admin/settings"), HTTP_POST, [&](AsyncWebServerRequest* request, JsonVariant &json) 
     {
