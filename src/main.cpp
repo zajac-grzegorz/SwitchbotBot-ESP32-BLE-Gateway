@@ -76,7 +76,7 @@ class ScanCallbacks : public NimBLEScanCallbacks
     void onResult(const NimBLEAdvertisedDevice *advertisedDevice) override
     {
         // This is a device with our MAC address
-        std::string botMacAddr = config.getString("ble_mac");
+        std::string botMacAddr = config.getString("bot_mac");
         // Convert to lowercase because NimBLE returns mac address in lowercase
         std::transform(botMacAddr.begin(), botMacAddr.end(), botMacAddr.begin(), ::tolower);
 
@@ -99,7 +99,7 @@ class ScanCallbacks : public NimBLEScanCallbacks
     void onScanEnd(const NimBLEScanResults &results, int reason) override
     {
         logger.info(RE_TAG, "Scan Ended, reason: %d, device count: %d; Restarting scan\n", reason, results.getCount());
-        int scanTimeMs = config.get<int>("scan_time");
+        int scanTimeMs = config.get<int>("bot_scantime");
         NimBLEDevice::getScan()->start(scanTimeMs, false, true);
 
         LED_COLOR_UPDATE(LED_COLOR_GREEN);
@@ -432,13 +432,13 @@ void setup()
     // load configuration data from NVS
     configureStorage();
 
-    server = new AsyncWebServer(config.get<int>("web_port"));
+    server = new AsyncWebServer(config.get<int>("dev_port"));
     espConnect = new Mycila::ESPConnect(*server);
 
     // basic authentication
     basicAuth.setUsername("admin");
     // basicAuth.setPassword("admin");
-    basicAuth.setPassword(config.getString("admin_pass"));
+    basicAuth.setPassword(config.getString("adm_pass"));
     basicAuth.setRealm("MyApp");
     basicAuth.setAuthFailureMessage("Authentication failed");
     basicAuth.setAuthType(AsyncAuthType::AUTH_BASIC);
@@ -509,7 +509,7 @@ void setup()
 
     server->on(AsyncURIMatcher::exact("/main"), HTTP_GET, [&](AsyncWebServerRequest* request) 
     {
-        AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (uint8_t*)(main_html_start), main_html_end - main_html_start);
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (uint8_t*)(settings_html_start), settings_html_end - settings_html_start);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     }).addMiddleware(&basicAuth);
@@ -519,28 +519,20 @@ void setup()
     {
         AsyncJsonResponse *response = new AsyncJsonResponse();
         JsonObject doc = response->getRoot().to<JsonObject>();
-        doc["ble_mac"] = config.getString("ble_mac");
-        doc["web_port"] = config.get<int>("web_port");
-        doc["scan_time"] = config.get<int>("scan_time");
-        doc["ble_power"] = config.get<int>("ble_power");
-        doc["admin_pass"] = config.getString("admin_pass");
-        doc["webserial_on"] = config.get<bool>("webserial_on");
-        
-        response->setLength();
-        request->send(response);
-    }).addMiddleware(&basicAuth);
 
-    // get stored admin settings
-    server->on(AsyncURIMatcher::exact("/admin/config"), HTTP_GET, [&](AsyncWebServerRequest* request) 
-    {
-        AsyncJsonResponse *response = new AsyncJsonResponse();
-        JsonObject doc = response->getRoot().to<JsonObject>();
-        doc["bot"]["mac"] = config.getString("ble_mac");
-        doc["device"]["port_web"] = config.get<int>("web_port");
-        doc["bot"]["scantime"] = config.get<int>("scan_time");
-        doc["bot"]["txpower"] = config.get<int>("ble_power");
-        doc["admin"]["password"] = config.getString("admin_pass");
-        doc["admin"]["webserial"] = config.get<bool>("webserial_on");
+        doc["network"]["ssid"] = config.getString("net_ssid");
+        doc["network"]["password"] = config.getString("net_pass");
+        doc["device"]["port_web"] = config.get<int>("dev_port");
+        doc["mqtt"]["enable"] = config.get<bool>("mqtt_en");
+        doc["mqtt"]["ip"] = config.getString("mqtt_ip");
+        doc["mqtt"]["port"] = config.get<int>("mqtt_port");
+        doc["mqtt"]["username"] = config.getString("mqtt_user");
+        doc["mqtt"]["password"] = config.getString("mqtt_pass");
+        doc["bot"]["mac"] = config.getString("bot_mac");
+        doc["bot"]["scantime"] = config.get<int>("bot_scantime");
+        doc["bot"]["txpower"] = config.get<int>("bot_txpower");
+        doc["admin"]["password"] = config.getString("adm_pass");
+        doc["admin"]["webserial"] = config.get<bool>("adm_webserial");
         
         response->setLength();
         request->send(response);
@@ -551,12 +543,19 @@ void setup()
     {
         JsonObject doc = json.as<JsonObject>();
 
-        config.setString("ble_mac", doc["ble_mac"].as<const char*>());
-        config.set<int>("web_port", doc["web_port"].as<int>());
-        config.set<int>("scan_time", doc["scan_time"].as<int>());
-        config.set<int>("ble_power", doc["ble_power"].as<int>());
-        config.setString("admin_pass", doc["admin_pass"].as<const char*>());
-        config.set<bool>("webserial_on", doc["webserial_on"].as<bool>());
+        config.setString("net_ssid", doc["network"]["ssid"].as<const char*>());
+        config.setString("net_pass", doc["network"]["password"].as<const char*>());
+        config.set<int>("dev_port", doc["device"]["port_web"].as<int>());
+        config.set<bool>("mqtt_en", doc["mqtt"]["enable"].as<bool>());
+        config.setString("mqtt_ip", doc["mqtt"]["ip"].as<const char*>());
+        config.set<int>("mqtt_port", doc["mqtt"]["port"].as<int>());
+        config.setString("mqtt_user", doc["mqtt"]["username"].as<const char*>());
+        config.setString("mqtt_pass", doc["mqtt"]["password"].as<const char*>());
+        config.setString("bot_mac", doc["bot"]["mac"].as<const char*>());
+        config.set<int>("bot_scantime", doc["bot"]["scantime"].as<int>());
+        config.set<int>("bot_txpower", doc["bot"]["txpower"].as<int>());
+        config.setString("adm_pass", doc["admin"]["password"].as<const char*>());
+        config.set<bool>("adm_webserial", doc["admin"]["webserial"].as<bool>());
 
         serializeJson(doc, Serial);
 
@@ -662,16 +661,16 @@ void setup()
     server->begin();
 
     // To allow log viewing over the web
-    configureWebSerial(config.get<bool>("webserial_on"), server);
+    configureWebSerial(config.get<bool>("adm_webserial"), server);
 
     logger.debug(RE_TAG, "Async Web Server started");
 
     /** Initialize NimBLE and set the device name */
     NimBLEDevice::init("SwitchBot-Bot-Client");
-    NimBLEDevice::whiteListAdd(NimBLEAddress(config.getString("ble_mac"), 0));
-    NimBLEDevice::setPower((esp_power_level_t) config.get<int>("ble_power"));
+    NimBLEDevice::whiteListAdd(NimBLEAddress(config.getString("bot_mac"), 0));
+    NimBLEDevice::setPower((esp_power_level_t) config.get<int>("bot_txpower"));
     
-    logger.debug(RE_TAG, "BLE power Tx level: %ld", config.get<int>("ble_power"));
+    logger.debug(RE_TAG, "BLE power Tx level: %ld", config.get<int>("bot_txpower"));
 
     pScan = NimBLEDevice::getScan();
 
@@ -707,7 +706,7 @@ void setup()
     }
 
     /** Start scanning for advertisers */ // move this to matter event handler?
-    int scanTimeMs = config.get<int>("scan_time");
+    int scanTimeMs = config.get<int>("bot_scantime");
     pScan->start(scanTimeMs);
 
     mqttClient.setServer("mqtt://192.168.68.100:1883");

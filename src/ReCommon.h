@@ -14,8 +14,6 @@
 
 extern const uint8_t settings_html_start[] asm("_binary__pio_embed_settings_html_gz_start");
 extern const uint8_t settings_html_end[] asm("_binary__pio_embed_settings_html_gz_end");
-extern const uint8_t main_html_start[] asm("_binary__pio_embed_main_html_gz_start");
-extern const uint8_t main_html_end[] asm("_binary__pio_embed_main_html_gz_end");
 
 inline Mycila::config::NVS storage;
 inline Mycila::config::Config config(storage);
@@ -27,12 +25,19 @@ void configureStorage()
 {
    // Declare configuration keys with optional default values
    // Key names must be ≤ 15 characters
-   config.configure("webserial_on", false);
-   config.configure("ble_mac", "f2:b2:02:06:1d:21");
-   config.configure("web_port", 80);
-   config.configure("scan_time", 5000);
-   config.configure("ble_power", 11);
-   config.configure("admin_pass", "admin");
+   config.configure("net_ssid", "");
+   config.configure("net_pass", "");
+   config.configure("dev_port", 80);
+   config.configure("mqtt_en", false);
+   config.configure("mqtt_ip", "");
+   config.configure("mqtt_port", 1883);
+   config.configure("mqtt_user", "");
+   config.configure("mqtt_pass", "");
+   config.configure("bot_mac", "f2:b2:02:06:1d:21");
+   config.configure("bot_scantime", 5000);
+   config.configure("bot_txpower", 11);
+   config.configure("adm_pass", "admin");
+   config.configure("adm_webserial", false);
 
    config.begin("BLEGateway", true); // Preload all values
 }

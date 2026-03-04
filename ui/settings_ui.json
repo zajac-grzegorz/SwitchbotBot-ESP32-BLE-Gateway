@@ -3,7 +3,7 @@
   "theme": {
     "accent": "#20a4a9"
   },
-  "endpoint": "/admin/config",
+  "endpoint": "/admin/settings",
   "pages": [
     {
       "id": "network",
@@ -165,28 +165,28 @@
       "buttons": [
         {
           "label": "Safeboot Mode",
-          "method": "POST",
+          "method": "GET",
           "endpoint": "/admin/safeboot",
           "confirm": "Are you sure you want to run the device in Safeboot Mode now?",
           "includeForm": false
         },
         {
           "label": "Restart",
-          "method": "POST",
+          "method": "GET",
           "endpoint": "/admin/restart",
           "confirm": "Are you sure you want to restart the device now?",
           "includeForm": false
         },
         {
           "label": "Decomission Matter",
-          "method": "POST",
+          "method": "GET",
           "endpoint": "/admin/decomission",
           "confirm": "This will decomission Matter, continue?",
           "includeForm": false
         },
         {
           "label": "Clear Configuration",
-          "method": "POST",
+          "method": "GET",
           "endpoint": "/admin/clear",
           "confirm": "This will clear the configuration. This action cannot be undone. Proceed?",
           "includeForm": false

@@ -7,7 +7,7 @@ Import("env")
 
 os.makedirs(".pio/embed", exist_ok=True)
 
-for filename in ["settings.html", "main.html"]:
+for filename in ["settings.html"]:
     skip = False
     # comment out next two lines to always rebuild
     #if os.path.isfile(".pio/embed/" + filename + ".gz"):

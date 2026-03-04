@@ -1,613 +1,828 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8" />
-  <title>BLE Gateway Settings</title>
-  <!-- Mobile-friendly scaling -->
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SwitchBot Bot BLE Gateway Settings</title>
+
+  <!-- The generator will place a <style>...</style> block here -->
   <style>
-    :root {
-      /* Light blue theme */
-      --bg: #f0f8ff;            /* AliceBlue */
-      --card-bg: #ffffff;
-      --primary: #1e90ff;       /* DodgerBlue */
-      --primary-700: #1c86ee;
-      --primary-900: #0f5ea8;
-      --steel: #b0c4de;         /* LightSteelBlue */
-      --danger: #dc3545;
-      --danger-700: #c82333;
-      --warn: #ff8c00;
-      --warn-700: #ff7f50;
-      --secondary: #00bfff;     /* DeepSkyBlue */
-      --text: #243b53;
-      --muted: #4f6d7a;
-      --error: #b00020;
+:root {
+  /* Light defaults */
+  --bg: #f7fbfd;
+  --panel: #ffffff;
+  --text: #102a43;
+  --muted: #627d98;
+  --accent: #20a4a9;
+  /* replaced by generator from schema.theme.accent or --accent flag */
+  --accent-600: color-mix(in oklab, var(--accent) 90%, black);
+  --accent-200: color-mix(in oklab, var(--accent) 20%, white);
+  --danger: #d64545;
+  --ok: #2f9e44;
+  --warn: #f08c00;
+  --border: #d9e2ec;
+  --shadow: 0 6px 24px rgba(16, 42, 67, 0.06), 0 2px 8px rgba(16, 42, 67, 0.08);
+}
 
-      /* Compact spacing scale */
-      --space-1: 4px;
-      --space-2: 8px;
-      --space-3: 12px;
-      --space-4: 16px;
-      --space-5: 20px;
+/* Forced dark (user toggle) */
+:root[data-theme="dark"] {
+  --bg: #0b1220;
+  --panel: #121a2b;
+  --text: #e6edf3;
+  --muted: #8aa0b6;
+  --border: #23324a;
+  --shadow: none;
+  --accent-600: color-mix(in oklab, var(--accent) 70%, black);
+  --accent-200: color-mix(in oklab, var(--accent) 35%, white);
+}
 
-      /* Horizontal padding inside the white form container (symmetric) */
-      --inner-pad-x: 16px;
+/* Auto-dark (system preference) when user didn’t force light */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1220;
+    --panel: #121a2b;
+    --text: #e6edf3;
+    --muted: #8aa0b6;
+    --border: #23324a;
+    --shadow: none;
+    --accent-600: color-mix(in oklab, var(--accent) 70%, black);
+    --accent-200: color-mix(in oklab, var(--accent) 35%, white);
+  }
+}
 
-      /* Compact radius and shadows */
-      --radius: 10px;
-      --shadow: 0 4px 12px rgba(0,0,0,0.10);
-      --shadow-focus: 0 0 0 3px rgba(30,144,255,0.28);
-    }
+* {
+  box-sizing: border-box
+}
 
-    /* Base layout */
-    html, body { height: 100%; }
-    body {
-      font-family: 'Segoe UI', Arial, sans-serif;
-      background-color: var(--bg);
-      margin: 0;
-      color: var(--text);
-      font-size: clamp(12px, 1.15vw, 15px);
-      line-height: 1.5;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      padding: var(--space-5) var(--space-3);
-    }
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif
+}
 
-    /* Container & form widths (compact, centered) */
-    .container {
-      max-width: 620px;
-      margin: 0 auto;
-    }
-    form {
-      background: var(--card-bg);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: var(--space-4) 0; /* vertical only; horizontal via .form-inner */
-      max-width: 520px;
-      margin: 0 auto;
-    }
-    .form-inner { padding: 0 var(--inner-pad-x); }
+.container {
+  max-width: 1000px;
+  margin: 24px auto;
+  padding: 0 16px
+}
 
-    h2 {
-      text-align: center;
-      color: var(--primary);
-      margin: 0 0 var(--space-4);
-      font-size: clamp(20px, 3vw, 28px);
-      font-weight: 700;
-    }
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px
+}
 
-    .section-title {
-      color: var(--primary);
-      font-weight: 700;
-      margin-top: var(--space-4);
-      margin-bottom: var(--space-2);
-      border-bottom: 1px solid #e6f2ff;
-      padding-bottom: var(--space-1);
-      font-size: clamp(16px, 2.2vw, 19px);
-    }
+h1 {
+  font-weight: 700;
+  font-size: 1.5rem;
+  margin: 0
+}
 
-    .field { margin: var(--space-3) 0; }
+.nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap
+}
 
-    label {
-      display: block;
-      font-weight: 600;
-      margin-bottom: var(--space-1);
-      color: var(--primary);
-    }
+.tab {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--muted)
+}
 
-    /* Inputs full-width within inner gutters */
-    input[type="text"],
-    input[type="number"] {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid var(--steel);
-      border-radius: 8px;
-      font-size: 0.98rem;
-      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
-      background: #ffffff;
-      box-sizing: border-box;
-      display: block;
-    }
-    input[type="text"]:focus,
-    input[type="number"]:focus {
-      border-color: var(--primary);
-      outline: none;
-      box-shadow: var(--shadow-focus);
-    }
+.tab.active {
+  background: var(--accent);
+  border-color: var(--accent-600);
+  color: white
+}
 
-    .error {
-      color: var(--error);
-      font-size: 0.88em;
-      margin-top: 4px;
-      min-height: 18px; /* avoid layout shift */
-    }
-    .invalid input {
-      border-color: var(--error);
-      background: #fff5f5;
-    }
-    .hint {
-      color: var(--muted);
-      font-size: 0.88em;
-      margin-top: 6px;
-    }
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+  margin: 12px 0
+}
 
-    .inline-note {
-      margin-top: 6px;
-      font-size: 0.88em;
-      color: var(--muted);
-    }
+legend {
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 8px
+}
 
-    .actions {
-      text-align: center;
-      margin-top: var(--space-4);
-      padding: 0 var(--inner-pad-x); /* aligns Save button with inputs horizontally */
-    }
+/* === Responsive grid – adjust columns here === */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px
+}
 
-    button {
-      background-color: var(--primary);
-      color: #fff;
-      border: none;
-      padding: 10px 16px;
-      font-size: 0.98rem;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background-color 0.2s, box-shadow 0.2s, transform 0.05s ease-in-out;
-      touch-action: manipulation;
-      min-height: 40px;
-    }
-    button:hover:not([disabled]) {
-      background-color: var(--primary-700);
-      box-shadow: 0 4px 10px rgba(30, 144, 255, 0.18);
-    }
-    button:active:not([disabled]) { transform: scale(0.985); }
-    button[disabled] {
-      background-color: #87cefa;
-      cursor: not-allowed;
-    }
+@media(min-width:640px) {
+  .form-grid {
+    grid-template-columns: repeat(2, 1fr)
+  }
+}
 
-    .status {
-      margin-top: var(--space-3);
-      text-align: center;
-      font-size: 0.95em;
-      min-height: 20px;
-      padding: 0 var(--inner-pad-x); /* keeps status aligned with inner gutters */
-    }
+/* 2 columns ≥ 640px */
+@media(min-width:960px) {
+  .form-grid {
+    grid-template-columns: repeat(3, 1fr)
+  }
+}
 
-    /* Device Actions Grid — aligned with inner gutters */
-    .device-actions {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: var(--space-2);
-      margin-top: var(--space-2);
-      padding: 0 var(--inner-pad-x);
-    }
+/* 3 columns ≥ 960px */
 
-    .btn-secondary { background-color: var(--secondary); }
-    .btn-secondary:hover:not([disabled]) { background-color: var(--primary-700); }
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px
+}
 
-    .btn-warning { background-color: var(--warn); }
-    .btn-warning:hover:not([disabled]) { background-color: var(--warn-700); }
+label {
+  font-size: .92rem;
+  color: var(--text)
+}
 
-    .btn-danger { background-color: var(--danger); }
-    .btn-danger:hover:not([disabled]) { background-color: var(--danger-700); }
+input[type="text"],
+input[type="password"],
+input[type="number"],
+textarea,
+select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  outline: none;
+}
 
-    /* Responsive tweaks */
-    @media (max-width: 768px) {
-      .container { max-width: 94vw; }
-      form { max-width: 94vw; }
-      .device-actions { grid-template-columns: 1fr; } /* stack buttons */
-      .actions button { width: 100%; }                /* full-width save on mobile */
-      button { min-height: 44px; }                    /* better touch size on mobile */
-    }
+textarea {
+  min-height: 90px;
+  resize: vertical
+}
 
-    @media (min-width: 1200px) {
-      .container { max-width: 700px; }
-      form { max-width: 560px; }
-    }
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-200)
+}
 
-    /* Optional dark mode support */
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #0f172a;
-        --card-bg: #0b203a;
-        --text: #e5e7eb;
-        --muted: #9aa8b4;
-        --steel: #2b4a6b;
-      }
-      form { box-shadow: none; border: 1px solid #1f3b5b; }
-      input[type="text"], input[type="number"] { background: #0d2a4a; color: var(--text); }
-      .invalid input { background: #2a0d13; }
-    }
-  </style>
+/* Real-time valid/invalid visuals */
+input.valid,
+textarea.valid,
+select.valid {
+  border-color: var(--ok);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ok) 20%, white);
+}
+
+input.invalid,
+textarea.invalid,
+select.invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--danger) 25%, white);
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 8px
+}
+
+.help {
+  font-size: .85rem;
+  color: var(--muted)
+}
+
+.error {
+  font-size: .85rem;
+  color: var(--danger);
+  display: none
+}
+
+.error.show {
+  display: block
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px
+}
+
+button.btn {
+  appearance: none;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+button.btn[disabled] {
+  opacity: .6;
+  cursor: not-allowed
+}
+
+button.btn.outline {
+  background: transparent;
+  color: var(--accent)
+}
+
+button.btn.danger {
+  border-color: var(--danger);
+  background: var(--danger)
+}
+
+button.btn.warn {
+  border-color: var(--warn);
+  background: var(--warn)
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 16px;
+  max-width: 92vw;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--text);
+  display: none;
+  z-index: 1000
+}
+
+.toast.show {
+  display: block
+}
+
+.footer {
+  color: var(--muted);
+  font-size: .85rem;
+  margin-top: 16px;
+  text-align: center
+}
+
+hr.sep {
+  border: 0;
+  border-top: 1px dashed var(--border);
+  margin: 16px 0
+}
+
+.badge {
+  display: inline-block;
+  background: var(--accent-200);
+  color: var(--text);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: .75rem
+}
+
+.cluster {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap
+}
+</style>
 </head>
+
 <body>
   <div class="container">
-    <h2>Switchbot BLE Gateway Settings</h2>
-
-    <form id="settingsForm" novalidate>
-      <div class="form-inner">
-        <div class="section-title">Configuration</div>
-
-        <div class="field" id="macField">
-          <label for="mac">MAC Address (format XX:XX:XX:XX:XX:XX):</label>
-          <input
-            type="text"
-            id="mac"
-            name="mac"
-            placeholder="AA:BB:CC:DD:EE:FF"
-            required
-            inputmode="latin"
-            autocomplete="off"
-          />
-          <div class="error" id="macError"></div>
-        </div>
-
-        <div class="field" id="portField">
-          <label for="port">Server Port (1–65535):</label>
-          <input
-            type="number"
-            id="port"
-            name="port"
-            min="1"
-            max="65535"
-            required
-            inputmode="numeric"
-            autocomplete="off"
-          />
-          <div class="error" id="portError"></div>
-        </div>
-
-        <div class="field" id="scanTimeField">
-          <label for="scanTime">Scan Time (milliseconds, 3000–20000):</label>
-          <input
-            type="number"
-            id="scanTime"
-            name="scanTime"
-            min="3000"
-            max="20000"
-            step="1000"
-            required
-            inputmode="numeric"
-            autocomplete="off"
-          />
-          <div class="error" id="scanTimeError"></div>
-        </div>
-
-        <!-- BLE Transmission Power (level 0-15, maps to -24..+21 dBm) -->
-        <div class="field" id="bleTxPowerField">
-          <label for="bleTxPower">BLE Transmission Power (level 0–15):</label>
-          <input
-            type="number"
-            id="bleTxPower"
-            name="bleTxPower"
-            min="0"
-            max="15"
-            step="1"
-            placeholder="Enter a level from 0 to 15"
-            required
-            inputmode="numeric"
-            autocomplete="off"
-          />
-          <div class="error" id="bleTxPowerError"></div>
-          <div class="inline-note">
-            Level 0 = −24 dBm, Level 15 = +21 dBm. 
-            <span id="bleTxPreview"></span>
-          </div>
-        </div>
-
-        <!-- Admin Password (plain text, not masked) — moved after BLE field -->
-        <div class="field" id="adminPasswordField">
-          <label for="adminPassword">Admin Password:</label>
-          <input
-            type="text"
-            id="adminPassword"
-            name="adminPassword"
-            placeholder="Enter admin password"
-            required
-            autocomplete="off"
-          />
-          <div class="error" id="adminPasswordError"></div>
-        </div>
-
-        <div class="field">
-          <label>
-            <input type="checkbox" id="webSerial" name="webSerial" />
-            Enable WebSerial
-          </label>
-        </div>
+    <div class="header">
+      <h1>SwitchBot Bot BLE Gateway Settings</h1>
+      <div class="cluster">
+        <div class="nav" id="tabs"></div>
+        <button id="themeToggle" class="btn outline" title="Toggle theme">Theme</button>
       </div>
+    </div>
 
-      <div class="actions">
-        <button type="submit" id="saveBtn" disabled>Save Settings</button>
-      </div>
+    <div id="pages"></div>
 
-      <div class="form-inner">
-        <div class="section-title">Device Actions</div>
-      </div>
-
-      <div class="device-actions">
-        <button type="button" id="btnSafeboot" class="btn-secondary">Safeboot Mode</button>
-        <button type="button" id="btnReset" class="btn-warning">Restart</button>
-        <button type="button" id="btnDecomission" class="btn-danger">Decomission Matter</button>
-        <button type="button" id="btnClear" class="btn-danger">Clear Configuration</button>
-      </div>
-
-      <div class="status" id="statusMsg" aria-live="polite"></div>
-    </form>
+    <div class="card">
+      <div class="btn-row" id="defaultButtons"></div>
+      <div class="footer">UI generated for ESP32 <span class="badge">responsive</span></div>
+    </div>
   </div>
 
+  <div class="toast" id="toast"></div>
+
+  <!-- The generator will inject the inline schema here -->
+  <script id="schema" type="application/json">{"title":"SwitchBot Bot BLE Gateway Settings","theme":{"accent":"#20a4a9"},"endpoint":"/admin/settings","pages":[{"id":"network","title":"Network","sections":[{"legend":"Wi‑Fi","fields":[{"type":"text","name":"network.ssid","label":"SSID","required":true,"placeholder":"Your Wi‑Fi name"},{"type":"password","name":"network.password","label":"Password","required":true,"minlength":8}]},{"legend":"Device","fields":[{"type":"number","name":"device.port_web","label":"Web Server Port","validator":"port","default":80,"min":1,"max":65535}]},{"legend":"MQTT","fields":[{"type":"checkbox","name":"mqtt.enable","label":"Enable MQTT"},{"type":"text","name":"mqtt.ip","label":"MQTT IP Address","validator":"ip","placeholder":"192.168.1.10"},{"type":"number","name":"mqtt.port","label":"MQTT Port","validator":"port","default":1883,"min":1,"max":65535},{"type":"text","name":"mqtt.username","label":"Username"},{"type":"password","name":"mqtt.password","label":"Password"}]}]},{"id":"bot","title":"SwitchBot","sections":[{"legend":"Bot","fields":[{"type":"text","name":"bot.mac","label":"MAC Address","validator":"mac","placeholder":"AA:BB:CC:DD:EE:FF"},{"type":"number","name":"bot.scantime","label":"Scan Time [ms]","validator":"port","default":5000,"min":3000,"max":20000,"help":"in milliseconds"},{"type":"select","name":"bot.txpower","label":"BLE Transmission Power","options":["0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15"],"default":"11"}]}],"buttons":[{"label":"Test Connection","method":"POST","endpoint":"/test_cloud","includeForm":true}]},{"id":"admin","title":"Admin","sections":[{"legend":"Admin","fields":[{"type":"text","name":"admin.password","label":"Admin Password","required":true,"minlength":5},{"type":"checkbox","name":"admin.webserial","label":"Enable WebSerial"}]}],"buttons":[{"label":"Safeboot Mode","method":"GET","endpoint":"/admin/safeboot","confirm":"Are you sure you want to run the device in Safeboot Mode now?","includeForm":false},{"label":"Restart","method":"GET","endpoint":"/admin/restart","confirm":"Are you sure you want to restart the device now?","includeForm":false},{"label":"Decomission Matter","method":"GET","endpoint":"/admin/decomission","confirm":"This will decomission Matter, continue?","includeForm":false},{"label":"Clear Configuration","method":"GET","endpoint":"/admin/clear","confirm":"This will clear the configuration. This action cannot be undone. Proceed?","includeForm":false}]}],"defaultButtons":[{"label":"Save All","kind":"save"}]}</script>
+
+  <!-- The generator will place a <script>...</script> block here -->
   <script>
-    // ---------- Validation Rules ----------
-    const macPattern = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
+(() => {
+  // ---------------- Utilities ----------------
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-    function validateMac(value) {
-      if (!value) return "MAC address is required.";
-      if (!macPattern.test(value.trim())) {
-        return "Invalid MAC format. Expected XX:XX:XX:XX:XX:XX.";
-      }
-      return "";
-    }
+  // CSS.escape fallback (older browsers)
+  const cssEscape = (s) => (window.CSS && CSS.escape) ? CSS.escape(s)
+    : String(s).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
 
-    function validatePort(value) {
-      if (value === "" || value === null) return "Server port is required.";
-      const n = Number(value);
-      if (!Number.isInteger(n)) return "Port must be an integer.";
-      if (n < 1 || n > 65535) return "Port must be between 1 and 65535.";
-      return "";
-    }
+  const showToast = (msg) => {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
+  };
 
-    function validateScanTime(value) {
-      if (value === "" || value === null) return "Scan time is required.";
-      const n = Number(value);
-      if (!Number.isInteger(n)) return "Scan time must be an integer.";
-      if (n < 3000) return "Scan time must be greater than 3000.";
-      if (n > 20000) return "Scan time cannot exceed 20000 ms.";
-      return "";
-    }
-
-    function validateBleLevel(value) {
-      if (value === "" || value === null) return "Server port is required.";
-      const n = Number(value);
-      if (!Number.isInteger(n)) return "Power Level must be an integer.";
-      if (n < 0 || n > 15) return "Level must be between 0 and 15.";
-      return "";
-    }
-
-    function validateAdminPassword(value) {
-      if (!value || !value.trim()) return "Admin password is required.";
-      return "";
-    }
-
-    function bleLevelToDbm(level) {
-      return -24 + (level * 3);
-    }
-
-    // ---------- DOM Elements ----------
-    const form = document.getElementById("settingsForm");
-    const macInput = document.getElementById("mac");
-    const portInput = document.getElementById("port");
-    const scanTimeInput = document.getElementById("scanTime");
-    const bleTxPowerInput = document.getElementById("bleTxPower");
-    const adminPasswordInput = document.getElementById("adminPassword");
-    const webSerialInput = document.getElementById("webSerial");
-
-    const macError = document.getElementById("macError");
-    const portError = document.getElementById("portError");
-    const scanTimeError = document.getElementById("scanTimeError");
-    const bleTxPowerError = document.getElementById("bleTxPowerError");
-    const adminPasswordError = document.getElementById("adminPasswordError");
-
-    const macField = document.getElementById("macField");
-    const portField = document.getElementById("portField");
-    const scanTimeField = document.getElementById("scanTimeField");
-    const bleTxPowerField = document.getElementById("bleTxPowerField");
-    const adminPasswordField = document.getElementById("adminPasswordField");
-
-    const saveBtn = document.getElementById("saveBtn");
-    const statusMsg = document.getElementById("statusMsg");
-
-    const bleTxPreview = document.getElementById("bleTxPreview");
-
-    // Device action buttons
-    const btnSafeboot = document.getElementById("btnSafeboot");
-    const btnReset = document.getElementById("btnReset");
-    const btnDecomission = document.getElementById("btnDecomission");
-    const btnClear = document.getElementById("btnClear");
-
-    // ---------- Helpers ----------
-    function setFieldValidity(fieldEl, errorEl, errorText) {
-      if (errorText) {
-        fieldEl.classList.add("invalid");
-        errorEl.textContent = errorText;
-      } else {
-        fieldEl.classList.remove("invalid");
-        errorEl.textContent = "";
-      }
-    }
-
-    function validateBleLevel(value) {
-      if (value === "" || value === null) return "Server port is required.";
-      const n = Number(value);
-      if (!Number.isInteger(n)) return "Power Level must be an integer.";
-      if (n < 0 || n > 15) return "Level must be between 0 and 15.";
-      return "";
-    }
-
-    function updateBlePreview() {
-      const p = Number(bleTxPowerInput.value);
-      if (p && p >= 0 && p <= 15) {
-        const dbm = bleLevelToDbm(p);
-        bleTxPreview.textContent = ` — Current: ${p} ⇒ ${dbm} dBm`;
-      } else {
-        bleTxPreview.textContent = "";
-      }
-    }
-
-    function validateAll() {
-      const macErr = validateMac(macInput.value);
-      const portErr = validatePort(portInput.value);
-      const scanErr = validateScanTime(scanTimeInput.value);
-      const bleErr = validateBleLevel(bleTxPowerInput.value);
-      const adminPwdErr = validateAdminPassword(adminPasswordInput.value);
-
-      setFieldValidity(macField, macError, macErr);
-      setFieldValidity(portField, portError, portErr);
-      setFieldValidity(scanTimeField, scanTimeError, scanErr);
-      setFieldValidity(bleTxPowerField, bleTxPowerError, bleErr);
-      setFieldValidity(adminPasswordField, adminPasswordError, adminPwdErr);
-
-      // HTML constraint validity (BLE is text, relies on required)
-      const htmlValid =
-        macInput.checkValidity() &&
-        portInput.checkValidity() &&
-        scanTimeInput.checkValidity() &&
-        bleTxPowerInput.checkValidity() &&
-        adminPasswordInput.checkValidity();
-
-      const allValid = !macErr && !portErr && !scanErr && !bleErr && !adminPwdErr && htmlValid;
-      saveBtn.disabled = !allValid;
-
-      updateBlePreview();
-      return allValid;
-    }
-
-    function debounce(fn, delay = 200) {
-      let t;
-      return function (...args) {
-        clearTimeout(t);
-        t = setTimeout(() => fn.apply(this, args), delay);
-      };
-    }
-    const validateAllDebounced = debounce(validateAll, 120);
-
-    // ---------- Live Validation ----------
-    macInput.addEventListener("input", validateAllDebounced);
-    portInput.addEventListener("input", validateAllDebounced);
-    scanTimeInput.addEventListener("input", validateAllDebounced);
-    bleTxPowerInput.addEventListener("input", validateAllDebounced);
-    adminPasswordInput.addEventListener("input", validateAllDebounced);
-
-    macInput.addEventListener("blur", validateAll);
-    portInput.addEventListener("blur", validateAll);
-    scanTimeInput.addEventListener("blur", validateAll);
-    bleTxPowerInput.addEventListener("blur", validateAll);
-    adminPasswordInput.addEventListener("blur", validateAll);
-
-    // ---------- Initial Load (POST) ----------
-    document.addEventListener("DOMContentLoaded", () => {
-      statusMsg.textContent = "Loading settings…";
-      fetch("/admin/settings")
-        .then((res) => res.ok ? res.json() : Promise.reject(res))
-        .then((data) => {
-          macInput.value = data.ble_mac ?? "";
-          portInput.value = data.web_port ?? 80;
-          scanTimeInput.value = data.scan_time ?? 3000;
-          bleTxPowerInput.value = data.ble_power ?? 11;
-          adminPasswordInput.value = data.admin_pass ?? "";
-          webSerialInput.checked = !!data.webserial_on;
-
-          validateAll();
-          statusMsg.textContent = "";
-        })
-        .catch((err) => {
-          console.error("Error loading settings:", err);
-          statusMsg.textContent = "Failed to load settings.";
-          validateAll();
-        });
+  const setNested = (obj, path, value) => {
+    const keys = path.split('.');
+    let cur = obj;
+    keys.forEach((k, i) => {
+      if (i === keys.length - 1) cur[k] = value;
+      else { if (!(k in cur)) cur[k] = {}; cur = cur[k]; }
     });
+  };
 
-    // ---------- Submit Settings (POST) ----------
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const ok = validateAll();
-      if (!ok) {
-        statusMsg.textContent = "Please fix validation errors before saving.";
-        return;
-      }
+  const getNested = (obj, path) => {
+    const keys = path.split('.');
+    let cur = obj;
+    for (const k of keys) {
+      if (cur == null || !(k in cur)) return undefined;
+      cur = cur[k];
+    }
+    return cur;
+  };
 
-      const payload = {
-        ble_mac: macInput.value.trim(),
-        web_port: Number(portInput.value),
-        scan_time: Number(scanTimeInput.value),
-        ble_power: Number(bleTxPowerInput.value),
-        admin_pass: adminPasswordInput.value,
-        webserial_on: webSerialInput.checked
-      };
+  const debounce = (fn, ms = 150) => {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn.apply(null, args), ms); };
+  };
 
-      saveBtn.disabled = true;
-      statusMsg.textContent = "Saving…";
+  // ---------------- Validators ----------------
+  const reMac = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
+  const reIPv4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
 
-      fetch("/admin/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      })
-        .then((res) => res.ok ? res.json() : Promise.reject(res))
-        .then(() => {
-          statusMsg.textContent = "Settings saved successfully.";
-        })
-        .catch((err) => {
-          console.error("Error saving settings:", err);
-          statusMsg.textContent = "Failed to save settings.";
-        })
-        .finally(() => {
-          validateAll();
-        });
-    });
-
-    // ---------- Device Actions (GET) ----------
-    async function getAction(url, label, confirmText = null) {
-      if (confirmText && !window.confirm(confirmText)) return;
-
-      statusMsg.textContent = `${label}…`;
-      const allButtons = [btnSafeboot, btnReset, btnDecomission, btnClear];
-      allButtons.forEach(b => b.disabled = true);
-
+  const validators = {
+    mac: (v) => reMac.test(v) ? null : "Invalid MAC (AA:BB:CC:DD:EE:FF)",
+    port: (v) => {
+      const n = Number(v);
+      if (v === '' || v == null) return "This field is required";
+      if (!Number.isInteger(n) || n < 1 || n > 65535) return "Port must be 1–65535";
+      return null;
+    },
+    ip_port: (v) => {
+      const [ip, port] = String(v).split(':');
+      if (!reIPv4.test(ip || '')) return "Invalid IPv4 address";
+      const n = Number(port);
+      if (!port || !Number.isInteger(n) || n < 1 || n > 65535) return "Port must be 1–65535";
+      return null;
+    },
+    ip: (v) => {
+      const ip = String(v);
+      if (!reIPv4.test(ip || '')) return "Invalid IPv4 address";
+      return null;
+    },
+    url: (v) => {
       try {
-        const res = await fetch(url, { method: "GET" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const u = new URL(v);
+        if (!/^https?:$/.test(u.protocol)) return "Use http or https";
+        return null;
+      } catch (e) {
+        return "Invalid URL";
+      }
+    }
+  };
 
-        // Try to read text or JSON; tolerate empty body
-        let msg = "";
-        const contentType = res.headers.get("content-type") || "";
-        if (contentType.includes("application/json")) {
-          await res.json().catch(() => ({}));
-        } else {
-          msg = await res.text().catch(() => "");
-        }
-        statusMsg.textContent = `${label} request sent successfully.${msg ? " " + msg : ""}`;
-      } catch (err) {
-        console.error(`Error during ${label}:`, err);
-        // statusMsg.textContent = `Failed to perform ${label.toLowerCase()}.`;
-      } finally {
-        allButtons.forEach(b => b.disabled = false);
-        statusMsg.textContent = `${label} request sent successfully.`;
-        
-        // location replace in 10 seconds
-        setTimeout(function() {
-          window.location.replace("/");
-        }, 10000);
+  function validateAgainstDefinition(def, value) {
+    // Required (with special-case for checkboxes)
+    if (def.required) {
+      const empty = value === undefined || value === null || value === '';
+      if (def.type === 'checkbox' || def.type === 'switch') {
+        if (value !== true) return "This field is required";
+      } else if (empty) {
+        return "This field is required";
       }
     }
 
-    btnSafeboot.addEventListener("click", () =>
-      getAction("/admin/safeboot", "Safeboot Mode", "Are you sure you want to run the device in Safeboot Mode now?")
-    );
+    // Empty optional -> no further validation
+    if (value === undefined || value === null || value === '') {
+      return null;
+    }
 
-    btnReset.addEventListener("click", () =>
-      getAction("/admin/restart", "Restart", "Are you sure you want to restart the device now?")
-    );
+    // Built-in validator
+    const t = def.validator;
+    if (t && validators[t]) {
+      const msg = validators[t](value, def);   // <-- correct invocation
+      if (msg) return msg;
+    }
 
-    btnDecomission.addEventListener("click", () =>
-      getAction("/admin/decomission", "Decomission Matter",
-        "This will decommission Matter. Continue?")
-    );
+    // Regex pattern
+    if (def.pattern) {
+      try {
+        const re = new RegExp(def.pattern);
+        if (!re.test(String(value))) return "Invalid format";
+      } catch (e) { /* ignore invalid pattern */ }
+    }
 
-    btnClear.addEventListener("click", () =>
-      getAction("/admin/clear", "Clear Configuration",
-        "This will clear the configuration. This action cannot be undone. Proceed?")
-    );
-  </script>
+    // Numeric / string constraints
+    if (def.type === 'number') {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return "Must be a number";
+      if (def.min !== undefined && n < def.min) return `Min ${def.min}`;
+      if (def.max !== undefined && n > def.max) return `Max ${def.max}`;
+    } else if (typeof value === 'string') {
+      if (def.minlength !== undefined && value.length < def.minlength) return `Min length ${def.minlength}`;
+      if (def.maxlength !== undefined && value.length > def.maxlength) return `Max length ${def.maxlength}`;
+    }
+    return null;
+  }
+
+  function el(tag, attrs = {}, children = []) {
+    const e = document.createElement(tag);
+    Object.entries(attrs).forEach(([k, v]) => {
+      if (k === 'class') e.className = v;
+      else if (k === 'for') e.htmlFor = v;
+      else if (k === 'html') e.innerHTML = v;
+      else e.setAttribute(k, v);
+    });
+    (Array.isArray(children) ? children : [children]).filter(Boolean).forEach(c => {
+      if (typeof c === 'string') e.appendChild(document.createTextNode(c));
+      else e.appendChild(c);
+    });
+    return e;
+  }
+
+  function validateField(def, input = null, valueOverride = undefined) {
+    const selector = `[name="${cssEscape(def.name)}"]`;
+    const elInput = input || document.querySelector(selector);
+    if (!elInput) return true;
+
+    let val;
+    if (valueOverride !== undefined) val = valueOverride;
+    else if (def.type === 'checkbox' || def.type === 'switch') val = elInput.checked;
+    else val = elInput.value;
+
+    const msg = validateAgainstDefinition(def, val);
+    const id = 'fld_' + def.name.replace(/[^a-zA-Z0-9_]/g, '_');
+    const err = document.getElementById(id + '_err');
+
+    if (msg) {
+      if (err) { err.textContent = msg; err.classList.add('show'); }
+      elInput.classList.remove('valid'); elInput.classList.add('invalid');
+      if (elInput.setCustomValidity) elInput.setCustomValidity(msg);
+      return false;
+    } else {
+      if (err) { err.textContent = ''; err.classList.remove('show'); }
+      elInput.classList.remove('invalid'); elInput.classList.add('valid');
+      if (elInput.setCustomValidity) elInput.setCustomValidity('');
+      return true;
+    }
+  }
+
+  function validateAll(schema) {
+    let ok = true;
+    (schema.pages || []).forEach(pg => {
+      (pg.sections || []).forEach(sec => {
+        (sec.fields || []).forEach(def => {
+          const res = validateField(def);
+          if (!res) ok = false;
+        });
+      });
+    });
+    return ok;
+  }
+
+  function createField(def) {
+    const wrap = el('div', { class: 'field' });
+    const id = 'fld_' + def.name.replace(/[^a-zA-Z0-9_]/g, '_');
+
+    const label = el('label', { for: id }, def.label || def.name);
+    let input;
+    const common = { id, name: def.name, placeholder: def.placeholder || '' };
+
+    switch (def.type) {
+      case 'textarea':
+        input = el('textarea', common);
+        if (def.maxlength) input.setAttribute('maxlength', String(def.maxlength));
+        if (def.minlength) input.setAttribute('minlength', String(def.minlength));
+        break;
+      case 'select':
+        input = el('select', common);
+        (def.options || []).forEach(opt => {
+          const o = typeof opt === 'string' ? { value: opt, label: opt } : opt;
+          input.appendChild(el('option', { value: o.value }, o.label || o.value));
+        });
+        break;
+      case 'checkbox':
+      case 'switch':
+        input = el('input', Object.assign({}, common, { type: 'checkbox' }));
+        break;
+      case 'number':
+        input = el('input', Object.assign({}, common, { type: 'number' }));
+        if (def.min !== undefined) input.setAttribute('min', String(def.min));
+        if (def.max !== undefined) input.setAttribute('max', String(def.max));
+        break;
+      default: // text/password/etc.
+        input = el('input', Object.assign({}, common, { type: def.type || 'text' }));
+        if (def.maxlength) input.setAttribute('maxlength', String(def.maxlength));
+        if (def.minlength) input.setAttribute('minlength', String(def.minlength));
+    }
+
+    if (def.required) input.setAttribute('required', 'true');
+
+    const help = def.help ? el('div', { class: 'help' }, def.help) : null;
+    const err = el('div', { class: 'error', id: id + '_err', 'aria-live': 'polite' });
+
+    // Real-time validation
+    const onValidate = () => {
+      const val = (def.type === 'checkbox' || def.type === 'switch') ? input.checked : input.value;
+      validateField(def, input, val);
+      updateSaveState();
+    };
+    const isTextual = (def.type === 'text' || def.type === 'password' || def.type === 'textarea' || !def.type);
+    const debounced = isTextual ? debounce(onValidate, 140) : onValidate;
+
+    input.addEventListener('input', debounced);
+    input.addEventListener('change', onValidate);
+    input.addEventListener('blur', onValidate);
+
+    if (def.type === 'checkbox' || def.type === 'switch') {
+      const row = el('div', { class: 'inline' }, [input, label]);
+      wrap.appendChild(row);
+      if (help) wrap.appendChild(help);
+      wrap.appendChild(err);
+    } else {
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+      if (help) wrap.appendChild(help);
+      wrap.appendChild(err);
+    }
+
+    // Apply default if present
+    if (Object.prototype.hasOwnProperty.call(def, 'default')) {
+      if (def.type === 'checkbox' || def.type === 'switch') input.checked = Boolean(def.default);
+      else input.value = String(def.default);
+    }
+
+    return wrap;
+  }
+
+  function createSection(sec) {
+    const card = el('fieldset', { class: 'card' });
+    if (sec.legend) card.appendChild(el('legend', {}, sec.legend));
+    const grid = el('div', { class: 'form-grid' });
+    (sec.fields || []).forEach(fd => grid.appendChild(createField(fd)));
+    card.appendChild(grid);
+    return card;
+  }
+
+  function collectData(schema) {
+    const out = {};
+    (schema.pages || []).forEach(pg => {
+      (pg.sections || []).forEach(sec => {
+        (sec.fields || []).forEach(def => {
+          const input = document.querySelector(`[name="${cssEscape(def.name)}"]`);
+          if (!input) return;
+          let val;
+          if (def.type === 'checkbox' || def.type === 'switch') val = input.checked;
+          else if (def.type === 'number') {
+            const num = Number(input.value);
+            val = Number.isFinite(num) ? num : null;
+          } else val = input.value;
+          setNested(out, def.name, val);
+        });
+      });
+    });
+    return out;
+  }
+
+  function applyData(schema, data) {
+    (schema.pages || []).forEach(pg => {
+      (pg.sections || []).forEach(sec => {
+        (sec.fields || []).forEach(def => {
+          const input = document.querySelector(`[name="${cssEscape(def.name)}"]`);
+          if (!input) return;
+          const val = getNested(data, def.name);
+          if (val === undefined) return;
+          if (def.type === 'checkbox' || def.type === 'switch') input.checked = Boolean(val);
+          else input.value = String(val);
+        });
+      });
+    });
+    validateAll(schema);
+    updateSaveState();
+  }
+
+  async function loadDefaults() {
+    try {
+      const endpoint = window._schema.endpoint || '/config';
+      const res = await fetch(endpoint, { method: 'GET', headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error(`GET ${endpoint} failed`);
+      const data = await res.json();
+      applyData(window._schema, data);
+      showToast('Configuration loaded');
+    } catch (e) {
+      showToast('Could not load defaults');
+      console.warn(e);
+    }
+  }
+
+  function firstInvalidInput(schema) {
+    for (const pg of (schema.pages || [])) {
+      for (const sec of (pg.sections || [])) {
+        for (const def of (sec.fields || [])) {
+          const input = document.querySelector(`[name="${cssEscape(def.name)}"]`);
+          const ok = validateField(def, input);
+          if (!ok) return input;
+        }
+      }
+    }
+    return null;
+  }
+
+  async function saveAll() {
+    const anyBad = !validateAll(window._schema);
+    updateSaveState();
+    if (anyBad) {
+      const firstBad = firstInvalidInput(window._schema);
+      if (firstBad) firstBad.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    const payload = collectData(window._schema);
+
+    try {
+      const endpoint = window._schema.endpoint || '/config';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(`POST ${endpoint} failed`);
+      showToast('Configuration saved');
+    } catch (e) {
+      showToast('Save failed');
+      console.warn(e);
+    }
+  }
+
+  async function callEndpoint(btn) {
+    try {
+      if (btn.confirm && !confirm(btn.confirm)) return;
+      let body = undefined;
+      const headers = {};
+      if ((btn.method || 'GET').toUpperCase() === 'POST') {
+        if (btn.includeForm) {
+          body = JSON.stringify(collectData(window._schema));
+          headers['Content-Type'] = 'application/json';
+        } else if (btn.payload) {
+          body = JSON.stringify(btn.payload);
+          headers['Content-Type'] = 'application/json';
+        }
+      }
+      const res = await fetch(btn.endpoint, { method: btn.method || 'GET', headers, body });
+      if (!res.ok) throw new Error('Call failed');
+      showToast((btn.label || 'Action') + ' done');
+    } catch (e) {
+      showToast((btn.label || 'Action') + ' failed');
+      console.warn(e);
+    }
+  }
+
+  // Save buttons registry
+  let _saveButtons = [];
+  function updateSaveState() {
+    const ok = validateAll(window._schema);
+    _saveButtons.forEach(b => b.disabled = !ok);
+  }
+
+  // ----- Theme toggle (light/dark/auto) -----
+  function applyTheme(theme) { // 'light' | 'dark' | null
+    const root = document.documentElement;
+    if (theme === 'light') {
+      root.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    } else if (theme === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      root.removeAttribute('data-theme'); // back to auto
+      localStorage.removeItem('theme');
+    }
+  }
+  function initTheme() {
+    const saved = localStorage.getItem('theme'); // 'light'|'dark'|null
+    applyTheme(saved || null);
+  }
+  function toggleTheme() {
+    const root = document.documentElement;
+    const current = root.getAttribute('data-theme'); // 'light'|'dark'|null
+    if (current === 'dark') applyTheme('light');
+    else if (current === 'light') applyTheme(null); // go to auto
+    else applyTheme('dark');
+  }
+
+  function render(schema) {
+    window._schema = schema;
+
+    // Theme (accent color from schema)
+    const accent = (schema.theme && schema.theme.accent) || getComputedStyle(document.documentElement).getPropertyValue('--accent') || '';
+    if (accent) document.documentElement.style.setProperty('--accent', accent);
+
+    // Tabs
+    const tabsWrap = $('#tabs');
+    tabsWrap.innerHTML = '';
+    (schema.pages || []).forEach((pg, i) => {
+      const t = el('button', { class: 'tab' + (i === 0 ? ' active' : ''), 'data-target': pg.id }, pg.title || pg.id);
+      t.addEventListener('click', () => {
+        $$('.tab', tabsWrap).forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        $$('.page').forEach(p => p.style.display = (p.id === 'page_' + pg.id ? 'block' : 'none'));
+      });
+      tabsWrap.appendChild(t);
+    });
+
+    // Pages
+    const pages = $('#pages');
+    pages.innerHTML = '';
+    (schema.pages || []).forEach((pg, i) => {
+      const pageEl = el('div', { class: 'page', id: 'page_' + pg.id, style: 'display:' + (i === 0 ? 'block' : 'none') });
+      (pg.sections || []).forEach(sec => pageEl.appendChild(createSection(sec)));
+
+      // Page-level buttons
+      if (Array.isArray(pg.buttons) && pg.buttons.length) {
+        const card = el('div', { class: 'card' });
+        const row = el('div', { class: 'btn-row' });
+        pg.buttons.forEach(btn => {
+          const b = el('button', { class: 'btn outline' }, btn.label || 'Action');
+          b.addEventListener('click', () => callEndpoint(btn));
+          row.appendChild(b);
+        });
+        card.appendChild(row);
+        pageEl.appendChild(card);
+      }
+
+      pages.appendChild(pageEl);
+    });
+
+    // Default buttons
+    const defWrap = $('#defaultButtons');
+    defWrap.innerHTML = '';
+    _saveButtons = [];
+    (schema.defaultButtons || [{ label: 'Save All', kind: 'save' }]).forEach(btn => {
+      let b;
+      if (btn.kind === 'save') {
+        b = el('button', { class: 'btn' }, btn.label || 'Save');
+        b.addEventListener('click', saveAll);
+        _saveButtons.push(b);
+      } else if (btn.kind === 'load') {
+        b = el('button', { class: 'btn outline' }, btn.label || 'Reload');
+        b.addEventListener('click', loadDefaults);
+      } else {
+        b = el('button', { class: 'btn outline' }, btn.label || 'Action');
+        b.addEventListener('click', () => callEndpoint(btn));
+      }
+      defWrap.appendChild(b);
+    });
+
+    // Theme toggle button
+    initTheme();
+    const themeBtn = document.getElementById('themeToggle');
+    if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
+
+    // Initial validation state (disabled until valid)
+    updateSaveState();
+
+    // Initial load from /config
+    loadDefaults();
+  }
+
+  // Bootstrap: use inline schema if available; else fetch external
+  function bootstrap() {
+    const tag = document.getElementById('schema');
+    if (tag) {
+      try { const schema = JSON.parse(tag.textContent); render(schema); return; }
+      catch (e) { console.warn('Bad inline schema:', e); }
+    }
+    const url = window.__SCHEMA_URL__ || 'schema.json';
+    fetch(url).then(r => { if (!r.ok) throw new Error('Cannot load schema'); return r.json(); })
+      .then(render)
+      .catch(err => { console.error(err); showToast('Schema load failed'); });
+  }
+  document.addEventListener('DOMContentLoaded', bootstrap);
+})();
+</script>
 </body>
-</html>
 
+</html>
