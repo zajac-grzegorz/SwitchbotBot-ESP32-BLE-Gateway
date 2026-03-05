@@ -507,13 +507,6 @@ void setup()
         request->send(response);
     }).addMiddleware(&basicAuth);
 
-    server->on(AsyncURIMatcher::exact("/main"), HTTP_GET, [&](AsyncWebServerRequest* request) 
-    {
-        AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (uint8_t*)(settings_html_start), settings_html_end - settings_html_start);
-        response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
-    }).addMiddleware(&basicAuth);
-
     // get stored admin settings
     server->on(AsyncURIMatcher::exact("/admin/settings"), HTTP_GET, [&](AsyncWebServerRequest* request) 
     {
