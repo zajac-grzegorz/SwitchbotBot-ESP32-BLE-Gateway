@@ -12,8 +12,10 @@
 #include "ReBLEUtils.h"
 #include "ReBLEConfig.h"
 #include "ReLED.h"
+#include "ReContext.h"
 
-static PsychicMqttClient mqttClient;
+// static PsychicMqttClient mqttClient;
+ReContext ctx;
 
 static AsyncWebServer* server;
 static AsyncWebServerRequestPtr pressRequest;
@@ -26,9 +28,9 @@ static const NimBLEAdvertisedDevice* advDevice = nullptr;
 static NimBLEScan* pScan = nullptr;
 
 // these can be inline global variables
-inline bool doConnect = false;
-inline std::string doCommand = "570100"; // default is press command
-inline MatterOnOffPlugin OnOffPlugin;
+// inline bool doConnect = false;
+// inline std::string doCommand = "570100"; // default is press command
+// inline MatterOnOffPlugin OnOffPlugin;
 
 static BLEUUID serviceUUID("cba20d00-224d-11e6-9fb8-0002a5d5c51b");
 static BLEUUID controlCharacteristicUUID("cba20002-224d-11e6-9fb8-0002a5d5c51b");
@@ -37,8 +39,10 @@ static BLEUUID notifyCharacteristicUUID("cba20003-224d-11e6-9fb8-0002a5d5c51b");
 Mycila::Task offMatterSwitchTask("Turn Off", [](void* params){
     logger.info(RE_TAG, "-> OFF Switch to false");
 
-    OnOffPlugin.setOnOff(false);
-    OnOffPlugin.updateAccessory();
+    MatterOnOffPlugin& onOffPlugin = ctx.getOnOffPlugin();
+
+    onOffPlugin.setOnOff(false);
+    onOffPlugin.updateAccessory();
 
     LED_COLOR_UPDATE(LED_COLOR_GREEN);
     LED_STATUS_UPDATE(start(LED_BLE_IDLE));
@@ -385,11 +389,11 @@ void handleNotFound(AsyncWebServerRequest *request)
 bool setPluginOnOff(bool state) {
     logger.info(RE_TAG, "User Callback :: New Plugin State = %s", state ? "ON" : "OFF");
   
-    doCommand = "570100";
+    ctx.setDoCommand("570100");
 
     if (state && advDevice)
     {
-        doConnect = true;
+        ctx.setDoConnect(true);
     }
 
     return true;
@@ -588,7 +592,10 @@ void setup()
     server->on("/admin/decomission", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         logger.debug(RE_TAG, "Decommissioning the Plugin Matter Accessory. It shall be commissioned again");
-        OnOffPlugin.setOnOff(false);
+
+        MatterOnOffPlugin& onOffPlugin = ctx.getOnOffPlugin();
+        onOffPlugin.setOnOff(false);
+
         Matter.decommission();
 
         request->send(200, "text/plain", "Decommissioning the Matter Accessory. It shall be commissioned again");
@@ -596,11 +603,11 @@ void setup()
 
     server->on("/switchbot/press", HTTP_GET, [](AsyncWebServerRequest *request)
     {
-        doCommand = "570100";
+        ctx.setDoCommand("570100");
 
         if (advDevice)
         {
-            doConnect = true;
+            ctx.setDoConnect(true);
             pressRequest = request->pause();
         }
         else
@@ -611,11 +618,11 @@ void setup()
 
     server->on("/switchbot/press", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        doCommand = "570100";
+        ctx.setDoCommand("570100")  ;
 
         if (advDevice)
         {
-            doConnect = true;
+            ctx.setDoConnect(true);
             pressRequest = request->pause();
         }
         else
@@ -631,11 +638,11 @@ void setup()
         if (request->hasParam("cmd") && !request->getParam("cmd")->value().isEmpty())
         {
             code = request->getParam("cmd")->value();
-            doCommand = code.c_str();
+            ctx.setDoCommand(code.c_str());
 
             if (advDevice)
             {
-                doConnect = true;
+                ctx.setDoConnect(true);
                 pressRequest = request->pause();
             }
             else
@@ -681,8 +688,9 @@ void setup()
     // Do not need active scan, only mac address is important during advertisment process
     // pScan->setActiveScan(true);
 
-    OnOffPlugin.begin();
-    OnOffPlugin.onChange(setPluginOnOff);
+    MatterOnOffPlugin& onOffPlugin = ctx.getOnOffPlugin();
+    onOffPlugin.begin();
+    onOffPlugin.onChange(setPluginOnOff);
 
     // Matter beginning - Last step, after all EndPoints are initialized
     Matter.begin();
@@ -690,8 +698,8 @@ void setup()
     if (Matter.isDeviceCommissioned()) 
     {
         logger.debug(RE_TAG, "Matter Node is commissioned and connected to the network. Ready for use");
-        logger.debug(RE_TAG, "Initial state: %s", OnOffPlugin.getOnOff() ? "ON" : "OFF");
-        OnOffPlugin.updateAccessory();  // configure the Plugin based on initial state
+        logger.debug(RE_TAG, "Initial state: %s", onOffPlugin.getOnOff() ? "ON" : "OFF");
+        onOffPlugin.updateAccessory();  // configure the Plugin based on initial state
     }
     else
     {
@@ -704,6 +712,8 @@ void setup()
 
     if (config.get<bool>("mqtt_en"))
     {
+        PsychicMqttClient& mqttClient = ctx.getMqttClient();
+
         mqttClient.setServer("mqtt://192.168.68.100:1883");
         mqttClient.setCredentials("reapartment", "reapartment");
         mqttClient.setClientId("BLEGateway");
@@ -717,7 +727,7 @@ void setup()
             logger.debug(RE_TAG, "Received Payload: %s", payload); 
         });
 
-        mqttClient.onConnect([](bool sessionPresent) {
+        mqttClient.onConnect([&](bool sessionPresent) {
             logger.debug(RE_TAG, "MQTT connected: %s, sessionPresent: %d", 
                 mqttClient.connected() ? "YES" : "NO", sessionPresent);
             logger.debug(RE_TAG, "MQTT clientID: %s", mqttClient.getClientId());
@@ -738,11 +748,11 @@ void loop()
     offMatterSwitchTask.tryRun();
     ReLED.getStatusLED()->check();
     
-    if (doConnect)
+    if (ctx.getDoConnect())
     {
-        doConnect = false;
+        ctx.setDoConnect(false);
         /** Found a device we want to connect to, do it now */
-        if (executeSwitchBotCommand(doCommand))
+        if (executeSwitchBotCommand(ctx.getDoCommand()))
         {
             logger.debug(RE_TAG, "Success! we should now be getting notifications");
             
