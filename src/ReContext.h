@@ -19,9 +19,13 @@ class ReContext
         return mqttClient;
     }
     
-    // const AsyncWebServer* getServer() {
-    //     return server;
-    // }
+    AsyncWebServer* getServer() {
+        return server;
+    }
+
+    void setServer(AsyncWebServer* srv) {
+        server = srv;
+    }
     
     // AsyncWebServerRequestPtr getPressRequest() {
     //     return pressRequest;
@@ -31,9 +35,13 @@ class ReContext
     //     return basicAuth;
     // }
     
-    // const Mycila::ESPConnect* getEspConnect() {
-    //     return espConnect;
-    // }
+    Mycila::ESPConnect* getEspConnect() {
+        return espConnect;
+    }
+
+    void setEspConnect(Mycila::ESPConnect* esp) {
+        espConnect = esp;
+    }
     
     // const NimBLEAdvertisedDevice* getAdvDevice() {
     //     return advDevice;
@@ -51,7 +59,7 @@ class ReContext
         doConnect = value;
     }
     
-    std::string getDoCommand() {
+    std::string& getDoCommand() {
         return doCommand;
     }
 
@@ -67,13 +75,13 @@ class ReContext
     private:
 
     static PsychicMqttClient mqttClient;
-    // static const AsyncWebServer* server;
+    static AsyncWebServer* server;
     // static AsyncWebServerRequestPtr pressRequest;
     
     // // basicAuth
     // static const AsyncAuthenticationMiddleware basicAuth;
 
-    // static const Mycila::ESPConnect* espConnect;
+    static Mycila::ESPConnect* espConnect;
 
     // static const NimBLEAdvertisedDevice* advDevice;
     // static const NimBLEScan* pScan;
