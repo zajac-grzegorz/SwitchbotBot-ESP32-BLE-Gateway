@@ -17,12 +17,12 @@
 // static PsychicMqttClient mqttClient;
 ReContext ctx;
 
-static AsyncWebServer* server;
+// static AsyncWebServer* server;
 static AsyncWebServerRequestPtr pressRequest;
 // basicAuth
 static AsyncAuthenticationMiddleware basicAuth;
 
-static Mycila::ESPConnect* espConnect;
+// static Mycila::ESPConnect* espConnect;
 
 static const NimBLEAdvertisedDevice* advDevice = nullptr;
 static NimBLEScan* pScan = nullptr;
@@ -436,8 +436,11 @@ void setup()
     // load configuration data from NVS
     configureStorage();
 
-    server = new AsyncWebServer(config.get<int>("dev_port"));
-    espConnect = new Mycila::ESPConnect(*server);
+    AsyncWebServer* server = new AsyncWebServer(config.get<int>("dev_port"));
+    ctx.setServer(server);
+
+    Mycila::ESPConnect* espConnect = new Mycila::ESPConnect(*server);
+    ctx.setEspConnect(espConnect);
 
     // basic authentication
     basicAuth.setUsername("admin");
@@ -456,7 +459,7 @@ void setup()
     });
 
     // network state listener
-    espConnect->listen([](__unused Mycila::ESPConnect::State previous, __unused Mycila::ESPConnect::State state) 
+    espConnect->listen([&](__unused Mycila::ESPConnect::State previous, __unused Mycila::ESPConnect::State state) 
     {
         switch (state)
         {
@@ -489,7 +492,7 @@ void setup()
     logger.debug(RE_TAG, "ESPConnect completed, continuing setup()...");
 
     // serve your home page here
-    server->on("/", handleRoot).setFilter([](__unused AsyncWebServerRequest* request) 
+    server->on("/", handleRoot).setFilter([&](__unused AsyncWebServerRequest* request) 
     { 
         return espConnect->getState() != Mycila::ESPConnect::State::PORTAL_STARTED; 
     });
@@ -744,7 +747,9 @@ void setup()
 
 void loop()
 {
+    Mycila::ESPConnect* espConnect = ctx.getEspConnect();
     espConnect->loop();
+    
     offMatterSwitchTask.tryRun();
     ReLED.getStatusLED()->check();
     

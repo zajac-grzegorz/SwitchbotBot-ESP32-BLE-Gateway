@@ -1,10 +1,10 @@
 #include "ReContext.h"
 
 PsychicMqttClient ReContext::mqttClient;
-// const AsyncWebServer* ReContext::server = nullptr;
+AsyncWebServer* ReContext::server = nullptr;
 // AsyncWebServerRequestPtr ReContext::pressRequest;
 // const AsyncAuthenticationMiddleware ReContext::basicAuth;
-// const Mycila::ESPConnect* ReContext::espConnect = nullptr;
+Mycila::ESPConnect* ReContext::espConnect = nullptr;
 // const NimBLEAdvertisedDevice* ReContext::advDevice = nullptr;
 // const NimBLEScan* ReContext::pScan = nullptr;
 bool ReContext::doConnect = false;
