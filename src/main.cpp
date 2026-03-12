@@ -492,7 +492,7 @@ void setup()
     logger.debug(RE_TAG, "ESPConnect completed, continuing setup()...");
 
     // serve your home page here
-    server->on("/", handleRoot).setFilter([&](__unused AsyncWebServerRequest* request) 
+    server->on("/", handleRoot).setFilter([espConnect](__unused AsyncWebServerRequest* request) 
     { 
         return espConnect->getState() != Mycila::ESPConnect::State::PORTAL_STARTED; 
     });
@@ -507,7 +507,7 @@ void setup()
         ESP.restart();
     }).addMiddleware(&basicAuth);
 
-    server->on(AsyncURIMatcher::exact("/admin"), HTTP_GET, [&](AsyncWebServerRequest* request) 
+    server->on(AsyncURIMatcher::exact("/admin"), HTTP_GET, [](AsyncWebServerRequest* request) 
     {
         AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (uint8_t*)(settings_html_start), settings_html_end - settings_html_start);
         response->addHeader("Content-Encoding", "gzip");
@@ -515,7 +515,7 @@ void setup()
     }).addMiddleware(&basicAuth);
 
     // get stored admin settings
-    server->on(AsyncURIMatcher::exact("/admin/settings"), HTTP_GET, [&](AsyncWebServerRequest* request) 
+    server->on(AsyncURIMatcher::exact("/admin/settings"), HTTP_GET, [](AsyncWebServerRequest* request) 
     {
         AsyncJsonResponse *response = new AsyncJsonResponse();
         JsonObject doc = response->getRoot().to<JsonObject>();
@@ -539,7 +539,7 @@ void setup()
     }).addMiddleware(&basicAuth);
 
      // store new admin settings
-    server->on(AsyncURIMatcher::exact("/admin/settings"), HTTP_POST, [&](AsyncWebServerRequest* request, JsonVariant &json) 
+    server->on(AsyncURIMatcher::exact("/admin/settings"), HTTP_POST, [](AsyncWebServerRequest* request, JsonVariant &json) 
     {
         JsonObject doc = json.as<JsonObject>();
 
