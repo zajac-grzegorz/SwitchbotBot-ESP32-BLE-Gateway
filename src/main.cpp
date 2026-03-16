@@ -10,27 +10,20 @@
 #include <PsychicMqttClient.h>
 #include "ReCommon.h"
 #include "ReBLEUtils.h"
-#include "ReBLEConfig.h"
 #include "ReLED.h"
 #include "ReContext.h"
+#include "ReServer.h"
 
 // static PsychicMqttClient mqttClient;
 ReContext ctx;
 
-// static AsyncWebServer* server;
-static AsyncWebServerRequestPtr pressRequest;
-// basicAuth
-static AsyncAuthenticationMiddleware basicAuth;
+ReServer* server = nullptr;
+Mycila::ESPConnect* espConnect = nullptr;
 
-// static Mycila::ESPConnect* espConnect;
+static AsyncWebServerRequestPtr pressRequest;
 
 static const NimBLEAdvertisedDevice* advDevice = nullptr;
 static NimBLEScan* pScan = nullptr;
-
-// these can be inline global variables
-// inline bool doConnect = false;
-// inline std::string doCommand = "570100"; // default is press command
-// inline MatterOnOffPlugin OnOffPlugin;
 
 static BLEUUID serviceUUID("cba20d00-224d-11e6-9fb8-0002a5d5c51b");
 static BLEUUID controlCharacteristicUUID("cba20002-224d-11e6-9fb8-0002a5d5c51b");
@@ -363,28 +356,6 @@ bool executeSwitchBotCommand(std::string cmd)
     return true;
 }
 
-void handleRoot(AsyncWebServerRequest *request) 
-{
-    request->send(200, "text/plain", "BLE and Matter ESP32 Gateway to Switchbot Bot");
-}
-
-void handleNotFound(AsyncWebServerRequest *request)
-{
-    String message = "Invalid Url\n\n";
-    message += "URI: ";
-    message += request->url();
-    message += "\nMethod: ";
-    message += (request->method() == HTTP_GET) ? "GET" : "POST";
-    message += "\nArguments: ";
-    message += request->args();
-    message += "\n";
-    for (uint8_t i = 0; i < request->args(); i++)
-    {
-        message += " " + request->argName(i) + ": " + request->arg(i) + "\n";
-    }
-    request->send(404, "text/plain", message);
-}
-
 // Matter Protocol Endpoint Callback
 bool setPluginOnOff(bool state) {
     logger.info(RE_TAG, "User Callback :: New Plugin State = %s", state ? "ON" : "OFF");
@@ -436,20 +407,7 @@ void setup()
     // load configuration data from NVS
     configureStorage();
 
-    AsyncWebServer* server = new AsyncWebServer(config.get<int>("dev_port"));
-    ctx.setServer(server);
-
-    Mycila::ESPConnect* espConnect = new Mycila::ESPConnect(*server);
-    ctx.setEspConnect(espConnect);
-
-    // basic authentication
-    basicAuth.setUsername("admin");
-    // basicAuth.setPassword("admin");
-    basicAuth.setPassword(config.getString("adm_pass"));
-    basicAuth.setRealm("MyApp");
-    basicAuth.setAuthFailureMessage("Authentication failed");
-    basicAuth.setAuthType(AsyncAuthType::AUTH_BASIC);
-    basicAuth.generateHash();  // precompute hash (optional but recommended)
+    server = new ReServer(config.get<int>("dev_port"));
 
     offMatterSwitchTask.setEnabled(true);
     offMatterSwitchTask.setType(Mycila::Task::Type::ONCE);
@@ -458,6 +416,10 @@ void setup()
         logger.debug(RE_TAG, "Task '%s' executed in %ld us", me.name(), elapsed);
     });
 
+    espConnect = new Mycila::ESPConnect(*server);
+
+    server->setESPConnect(espConnect);
+    
     // network state listener
     espConnect->listen([&](__unused Mycila::ESPConnect::State previous, __unused Mycila::ESPConnect::State state) 
     {
@@ -491,118 +453,6 @@ void setup()
     espConnect->begin("BLEGateway", "BLEGateway");
     logger.debug(RE_TAG, "ESPConnect completed, continuing setup()...");
 
-    // serve your home page here
-    server->on("/", handleRoot).setFilter([espConnect](__unused AsyncWebServerRequest* request) 
-    { 
-        return espConnect->getState() != Mycila::ESPConnect::State::PORTAL_STARTED; 
-    });
-    
-    // clear persisted config
-    server->on("/admin/clear", HTTP_GET, [&](AsyncWebServerRequest* request) 
-    {
-        espConnect->clearConfiguration();
-        config.clear();
-        request->send(200);
-        
-        ESP.restart();
-    }).addMiddleware(&basicAuth);
-
-    server->on(AsyncURIMatcher::exact("/admin"), HTTP_GET, [](AsyncWebServerRequest* request) 
-    {
-        AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (uint8_t*)(settings_html_start), settings_html_end - settings_html_start);
-        response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
-    }).addMiddleware(&basicAuth);
-
-    // get stored admin settings
-    server->on(AsyncURIMatcher::exact("/admin/settings"), HTTP_GET, [](AsyncWebServerRequest* request) 
-    {
-        AsyncJsonResponse *response = new AsyncJsonResponse();
-        JsonObject doc = response->getRoot().to<JsonObject>();
-
-        doc["network"]["ssid"] = config.getString("net_ssid");
-        doc["network"]["password"] = config.getString("net_pass");
-        doc["device"]["port_web"] = config.get<int>("dev_port");
-        doc["mqtt"]["enable"] = config.get<bool>("mqtt_en");
-        doc["mqtt"]["ip"] = config.getString("mqtt_ip");
-        doc["mqtt"]["port"] = config.get<int>("mqtt_port");
-        doc["mqtt"]["username"] = config.getString("mqtt_user");
-        doc["mqtt"]["password"] = config.getString("mqtt_pass");
-        doc["bot"]["mac"] = config.getString("bot_mac");
-        doc["bot"]["scantime"] = config.get<int>("bot_scantime");
-        doc["bot"]["txpower"] = config.get<int>("bot_txpower");
-        doc["admin"]["password"] = config.getString("adm_pass");
-        doc["admin"]["webserial"] = config.get<bool>("adm_webserial");
-        
-        response->setLength();
-        request->send(response);
-    }).addMiddleware(&basicAuth);
-
-     // store new admin settings
-    server->on(AsyncURIMatcher::exact("/admin/settings"), HTTP_POST, [](AsyncWebServerRequest* request, JsonVariant &json) 
-    {
-        JsonObject doc = json.as<JsonObject>();
-
-        config.setString("net_ssid", doc["network"]["ssid"].as<const char*>());
-        config.setString("net_pass", doc["network"]["password"].as<const char*>());
-        config.set<int>("dev_port", doc["device"]["port_web"].as<int>());
-        config.set<bool>("mqtt_en", doc["mqtt"]["enable"].as<bool>());
-        config.setString("mqtt_ip", doc["mqtt"]["ip"].as<const char*>());
-        config.set<int>("mqtt_port", doc["mqtt"]["port"].as<int>());
-        config.setString("mqtt_user", doc["mqtt"]["username"].as<const char*>());
-        config.setString("mqtt_pass", doc["mqtt"]["password"].as<const char*>());
-        config.setString("bot_mac", doc["bot"]["mac"].as<const char*>());
-        config.set<int>("bot_scantime", doc["bot"]["scantime"].as<int>());
-        config.set<int>("bot_txpower", doc["bot"]["txpower"].as<int>());
-        config.setString("adm_pass", doc["admin"]["password"].as<const char*>());
-        config.set<bool>("adm_webserial", doc["admin"]["webserial"].as<bool>());
-
-        serializeJson(doc, Serial);
-
-        request->send(200, "application/json", "{}");
-    }).addMiddleware(&basicAuth);
-
-    server->on("/heap", HTTP_GET, [](AsyncWebServerRequest *request)
-    {
-        JsonDocument doc;
-        doc["Heap_size"] = ESP.getHeapSize();
-        doc["Free_heap"] = ESP.getFreeHeap();
-        doc["Min_Free_Heap"] = ESP.getMinFreeHeap();
-        doc["Max_Alloc_Heap"] = ESP.getMaxAllocHeap();
-        
-        String output;
-        serializeJson(doc, output);
-        request->send(200, "application/json", output);
-    });
-
-    server->on("/admin/restart", HTTP_GET, [](AsyncWebServerRequest *request)
-    {
-        request->send(200, "text/plain", "Device has been restarted");
-        ESP.restart();
-    }).addMiddleware(&basicAuth);
-
-    // server->on("/admin/safeboot", HTTP_GET, [](AsyncWebServerRequest *request)
-    // {
-    //     request->send(200, "text/html", "<form method='POST' action='/admin/safeboot' enctype='multipart/form-data'><input type='submit' value='Restart in SafeBoot mode'></form>");
-    // }).addMiddleware(&basicAuth);
-
-    server->on("/admin/safeboot", HTTP_GET, [](AsyncWebServerRequest *request)
-    {
-        request->send(200, "text/plain", "Restarting in SafeBoot mode...");
-        Mycila::System::restartFactory("safeboot", 1000);
-    }).addMiddleware(&basicAuth);
-
-    server->on("/admin/decomission", HTTP_GET, [](AsyncWebServerRequest *request)
-    {
-        logger.debug(RE_TAG, "Decommissioning the Plugin Matter Accessory. It shall be commissioned again");
-
-        MatterOnOffPlugin& onOffPlugin = ctx.getOnOffPlugin();
-        onOffPlugin.setOnOff(false);
-
-        Matter.decommission();
-
-        request->send(200, "text/plain", "Decommissioning the Matter Accessory. It shall be commissioned again");
-    }).addMiddleware(&basicAuth);
 
     server->on("/switchbot/press", HTTP_GET, [](AsyncWebServerRequest *request)
     {
@@ -660,7 +510,6 @@ void setup()
     });
 
 
-    server->onNotFound(handleNotFound);
     server->begin();
 
     // To allow log viewing over the web
@@ -747,7 +596,6 @@ void setup()
 
 void loop()
 {
-    Mycila::ESPConnect* espConnect = ctx.getEspConnect();
     espConnect->loop();
     
     offMatterSwitchTask.tryRun();
