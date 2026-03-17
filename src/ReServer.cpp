@@ -2,6 +2,7 @@
 #include "ReContext.h"
 #include "ReCommon.h"
 #include <MycilaSystem.h>
+#include <Matter.h>
 
 ReServer::ReServer(uint16_t port) : AsyncWebServer(port)
 {
@@ -10,6 +11,20 @@ ReServer::ReServer(uint16_t port) : AsyncWebServer(port)
 void ReServer::setESPConnect(Mycila::ESPConnect *esp)
 {
     espConnect = esp;
+}
+
+void ReServer::pressRequestNotifyJson(const std::string &resultData)
+{
+    if (auto request = pressRequest.lock())
+    {
+        JsonDocument doc;
+        doc["status"] = resultData.substr(0, 2);
+        doc["payload"] = resultData.substr(2);
+
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    }
 }
 
 void ReServer::begin()
@@ -43,26 +58,28 @@ void ReServer::setHandlers()
 
     on("admin/clear", HTTP_GET, (ArRequestHandlerFunction)std::bind(&ReServer::adminClearHandler, this, std::placeholders::_1))
         .addMiddleware(&basicAuth);
-    
+
     on(AsyncURIMatcher::exact("/admin"), HTTP_GET, (ArRequestHandlerFunction)std::bind(&ReServer::adminHandler, this, std::placeholders::_1))
         .addMiddleware(&basicAuth);
-    
+
     on(AsyncURIMatcher::exact("/admin/settings"), HTTP_GET, (ArRequestHandlerFunction)std::bind(&ReServer::adminSettingsGetHandler, this, std::placeholders::_1))
         .addMiddleware(&basicAuth);
-    
+
     on(AsyncURIMatcher::exact("/admin/settings"), HTTP_POST, std::bind(&ReServer::adminSettingsPostHandler, this, std::placeholders::_1, std::placeholders::_2))
         .addMiddleware(&basicAuth);
-    
+
     on("/admin/restart", HTTP_GET, (ArRequestHandlerFunction)std::bind(&ReServer::adminRestartHandler, this, std::placeholders::_1))
         .addMiddleware(&basicAuth);
-    
+
     on("/admin/safeboot", HTTP_GET, (ArRequestHandlerFunction)std::bind(&ReServer::adminSafebootHandler, this, std::placeholders::_1))
         .addMiddleware(&basicAuth);
-    
+
     on("/admin/decomission", HTTP_GET, (ArRequestHandlerFunction)std::bind(&ReServer::adminDecommissionHandler, this, std::placeholders::_1))
         .addMiddleware(&basicAuth);
-    
-    
+
+    on("/switchbot/press", HTTP_GET | HTTP_POST, (ArRequestHandlerFunction)std::bind(&ReServer::switchbotPressHandler, this, std::placeholders::_1));
+
+    on("/switchbot/command", HTTP_GET | HTTP_POST, (ArRequestHandlerFunction)std::bind(&ReServer::switchbotCommandHandler, this, std::placeholders::_1));
 }
 
 void ReServer::handleRoot(AsyncWebServerRequest *request)
@@ -184,17 +201,17 @@ void ReServer::adminDecommissionHandler(AsyncWebServerRequest *request)
 
 void ReServer::switchbotPressHandler(AsyncWebServerRequest *request)
 {
-    // ctx.setDoCommand("570100");
+    ctx.setDoCommand("570100");
 
-    // if (advDevice)
-    // {
-    //     ctx.setDoConnect(true);
-    //     pressRequest = request->pause();
-    // }
-    // else
-    // {
-    //     request->send(200, "text/plain", "Device is not connected, command NOT executed...");
-    // }
+    if (ctx.getBleDeviceFound())
+    {
+        ctx.setDoConnect(true);
+        pressRequest = request->pause();
+    }
+    else
+    {
+        request->send(200, "text/plain", "Device is not connected, command NOT executed...");
+    }
 }
 
 void ReServer::switchbotCommandHandler(AsyncWebServerRequest *request)
@@ -204,17 +221,17 @@ void ReServer::switchbotCommandHandler(AsyncWebServerRequest *request)
     if (request->hasParam("cmd") && !request->getParam("cmd")->value().isEmpty())
     {
         code = request->getParam("cmd")->value();
-        // ctx.setDoCommand(code.c_str());
+        ctx.setDoCommand(code.c_str());
 
-        // if (advDevice)
-        // {
-        //     ctx.setDoConnect(true);
-        //     pressRequest = request->pause();
-        // }
-        // else
-        // {
-        //     request->send(200, "text/plain", "Device is not connected, command NOT executed");
-        // }
+        if (ctx.getBleDeviceFound())
+        {
+            ctx.setDoConnect(true);
+            pressRequest = request->pause();
+        }
+        else
+        {
+            request->send(200, "text/plain", "Device is not connected, command NOT executed");
+        }
     }
     else
     {

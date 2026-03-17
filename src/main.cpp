@@ -1,8 +1,6 @@
 #include <Arduino.h>
-#include <NimBLEDevice.h>
-#include <WiFi.h>
 #include <Matter.h>
-#include <ESPAsyncWebServer.h>
+#include <NimBLEDevice.h>
 #include <MycilaESPConnect.h>
 #include <MycilaSystem.h>
 #include <MycilaTaskManager.h>
@@ -14,16 +12,16 @@
 #include "ReContext.h"
 #include "ReServer.h"
 
-// static PsychicMqttClient mqttClient;
-ReContext ctx;
+static PsychicMqttClient mqttClient;
+static ReContext ctx;
 
 ReServer* server = nullptr;
 Mycila::ESPConnect* espConnect = nullptr;
 
-static AsyncWebServerRequestPtr pressRequest;
-
 static const NimBLEAdvertisedDevice* advDevice = nullptr;
 static NimBLEScan* pScan = nullptr;
+
+static MatterOnOffPlugin onOffPlugin;
 
 static BLEUUID serviceUUID("cba20d00-224d-11e6-9fb8-0002a5d5c51b");
 static BLEUUID controlCharacteristicUUID("cba20002-224d-11e6-9fb8-0002a5d5c51b");
@@ -31,8 +29,6 @@ static BLEUUID notifyCharacteristicUUID("cba20003-224d-11e6-9fb8-0002a5d5c51b");
 
 Mycila::Task offMatterSwitchTask("Turn Off", [](void* params){
     logger.info(RE_TAG, "-> OFF Switch to false");
-
-    MatterOnOffPlugin& onOffPlugin = ctx.getOnOffPlugin();
 
     onOffPlugin.setOnOff(false);
     onOffPlugin.updateAccessory();
@@ -86,6 +82,8 @@ class ScanCallbacks : public NimBLEScanCallbacks
 
             /** Save the device reference in a global for the client to use*/
             advDevice = advertisedDevice;
+            
+            ctx.setBleDeviceFound(true);
 
             LED_COLOR_UPDATE(LED_COLOR_GREEN);
             LED_STATUS_UPDATE(on());
@@ -123,16 +121,7 @@ void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData,
     str = "*** Value = " + resultData;
     logger.info(RE_TAG, "%s", str.c_str());
 
-    if (auto request = pressRequest.lock()) 
-    {
-        JsonDocument doc;
-        doc["status"] = resultData.substr(0, 2);
-        doc["payload"] = resultData.substr(2);
-        
-        String output;
-        serializeJson(doc, output);
-        request->send(200, "application/json", output);
-    } 
+    server->pressRequestNotifyJson(resultData);
 
     offMatterSwitchTask.resume(RE_TASK_RESUME_TIME_MS);
 }
@@ -453,63 +442,6 @@ void setup()
     espConnect->begin("BLEGateway", "BLEGateway");
     logger.debug(RE_TAG, "ESPConnect completed, continuing setup()...");
 
-
-    server->on("/switchbot/press", HTTP_GET, [](AsyncWebServerRequest *request)
-    {
-        ctx.setDoCommand("570100");
-
-        if (advDevice)
-        {
-            ctx.setDoConnect(true);
-            pressRequest = request->pause();
-        }
-        else
-        {
-            request->send(200, "text/plain", "Device is not connected, command NOT executed...");
-        }
-    });
-
-    server->on("/switchbot/press", HTTP_POST, [](AsyncWebServerRequest *request)
-    {
-        ctx.setDoCommand("570100")  ;
-
-        if (advDevice)
-        {
-            ctx.setDoConnect(true);
-            pressRequest = request->pause();
-        }
-        else
-        {
-            request->send(200, "text/plain", "Device is not connected, command NOT executed...");
-        }
-    });
-
-    server->on("/switchbot/command", HTTP_GET, [](AsyncWebServerRequest *request)
-    {
-        String code;
-
-        if (request->hasParam("cmd") && !request->getParam("cmd")->value().isEmpty())
-        {
-            code = request->getParam("cmd")->value();
-            ctx.setDoCommand(code.c_str());
-
-            if (advDevice)
-            {
-                ctx.setDoConnect(true);
-                pressRequest = request->pause();
-            }
-            else
-            {
-                request->send(200, "text/plain", "Device is not connected, command NOT executed");
-            }
-        }
-        else
-        {
-            request->send(200, "text/plain", "Missing parameter");
-        }
-    });
-
-
     server->begin();
 
     // To allow log viewing over the web
@@ -540,7 +472,6 @@ void setup()
     // Do not need active scan, only mac address is important during advertisment process
     // pScan->setActiveScan(true);
 
-    MatterOnOffPlugin& onOffPlugin = ctx.getOnOffPlugin();
     onOffPlugin.begin();
     onOffPlugin.onChange(setPluginOnOff);
 
@@ -564,8 +495,6 @@ void setup()
 
     if (config.get<bool>("mqtt_en"))
     {
-        PsychicMqttClient& mqttClient = ctx.getMqttClient();
-
         mqttClient.setServer("mqtt://192.168.68.100:1883");
         mqttClient.setCredentials("reapartment", "reapartment");
         mqttClient.setClientId("BLEGateway");
@@ -604,6 +533,7 @@ void loop()
     if (ctx.getDoConnect())
     {
         ctx.setDoConnect(false);
+        
         /** Found a device we want to connect to, do it now */
         if (executeSwitchBotCommand(ctx.getDoCommand()))
         {
@@ -621,16 +551,8 @@ void loop()
 
             offMatterSwitchTask.resume(RE_TASK_RESUME_TIME_MS);
 
-            if (auto request = pressRequest.lock()) 
-            {
-                JsonDocument doc;
-                doc["status"] = "ER";
-                doc["payload"] = "Error with connection to Switchbot";
-                
-                String output;
-                serializeJson(doc, output);
-                request->send(200, "application/json", output);
-            }
+            std::string resultData = "ERError with connection to Switchbot";
+            server->pressRequestNotifyJson(resultData);
         }
     }
 }
