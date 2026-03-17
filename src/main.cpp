@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <Matter.h>
-#include <NimBLEDevice.h>
 #include <MycilaESPConnect.h>
 #include <MycilaSystem.h>
 #include <MycilaTaskManager.h>
@@ -15,21 +14,12 @@
 
 static PsychicMqttClient mqttClient;
 static ReContext ctx;
+static ReBLEDevice bleDevice;
 
 ReServer* server = nullptr;
 Mycila::ESPConnect* espConnect = nullptr;
 
-// static const NimBLEAdvertisedDevice* advDevice = nullptr;
-static NimBLEScan* pScan = nullptr;
-
-ReClientCallbacks clientCallbacks;
-ReScanCallbacks scanCallbacks;
-
 static MatterOnOffPlugin onOffPlugin;
-
-static BLEUUID serviceUUID("cba20d00-224d-11e6-9fb8-0002a5d5c51b");
-static BLEUUID controlCharacteristicUUID("cba20002-224d-11e6-9fb8-0002a5d5c51b");
-static BLEUUID notifyCharacteristicUUID("cba20003-224d-11e6-9fb8-0002a5d5c51b");
 
 Mycila::Task offMatterSwitchTask("Turn Off", [](void* params){
     logger.info(RE_TAG, "-> OFF Switch to false");
@@ -46,247 +36,15 @@ Mycila::Task offMatterSwitchTask("Turn Off", [](void* params){
     LED_STATUS_UPDATE(start(LED_BLE_IDLE));
 });
 
+
 /** Notification / Indication receiving handler callback */
-void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify)
+void updateAccessoryWithBleData(std::string& resultData)
 {
-    std::string str = (isNotify == true) ? "Notification" : "Indication";
-    str += " from ";
-    str += pRemoteCharacteristic->getClient()->getPeerAddress().toString();
-    logger.debug(RE_TAG, "%s", str.c_str());
-
-    str = "* Service = " + pRemoteCharacteristic->getRemoteService()->getUUID().toString();
-    logger.debug(RE_TAG, "%s", str.c_str());
-
-    str = "** Characteristic = " + pRemoteCharacteristic->getUUID().toString();
-    logger.debug(RE_TAG, "%s", str.c_str());
-
-    std::string resultData = NimBLEUtils::dataToHexString(pData, length);
-
-    str = "*** Value = " + resultData;
-    logger.info(RE_TAG, "%s", str.c_str());
-
     server->pressRequestNotifyJson(resultData);
 
     offMatterSwitchTask.resume(RE_TASK_RESUME_TIME_MS);
-}
 
-/** Handles the provisioning of clients and connects / interfaces with the server */
-bool connectToSwitchBot()
-{
-    NimBLEClient *pClient = nullptr;
-
-    /** Check if we have a client we should reuse first **/
-    if (NimBLEDevice::getCreatedClientCount())
-    {
-        /**
-         *  Special case when we already know this device, we send false as the
-         *  second argument in connect() to prevent refreshing the service database.
-         *  This saves considerable time and power.
-         */
-        pClient = NimBLEDevice::getClientByPeerAddress(scanCallbacks.getAdvDevice()->getAddress());
-
-        if (pClient)
-        {
-            if (pClient->isConnected())
-            {
-                logger.info(RE_TAG, "Client exists and is already conected");
-                return true;
-            } 
-            else
-            {
-                if (!pClient->connect(scanCallbacks.getAdvDevice(), false))
-                {
-                    logger.error(RE_TAG, "Reconnect failed");
-                    return false;
-                }
-
-                logger.info(RE_TAG, "Reconnected client");
-            }
-        }
-        else
-        {
-            /**
-             *  We don't already have a client that knows this device,
-             *  check for a client that is disconnected that we can use.
-             */
-            pClient = NimBLEDevice::getDisconnectedClient();
-        }
-    }
-
-    /** No client to reuse? Create a new one. */
-    if (!pClient)
-    {
-        if (NimBLEDevice::getCreatedClientCount() >= MYNEWT_VAL(BLE_MAX_CONNECTIONS))
-        {
-            logger.error(RE_TAG, "Max clients reached - no more connections available");
-            return false;
-        }
-
-        pClient = NimBLEDevice::createClient();
-
-        logger.info(RE_TAG, "New client created");
-
-        pClient->setClientCallbacks(&clientCallbacks, false);
-        /**
-         *  Set initial connection parameters:
-         *  These settings are safe for 3 clients to connect reliably, can go faster if you have less
-         *  connections. Timeout should be a multiple of the interval, minimum is 100ms.
-         *  Min interval: 12 * 1.25ms = 15, Max interval: 12 * 1.25ms = 15, 0 latency, 150 * 10ms = 1500ms timeout
-         */
-        pClient->setConnectionParams(12, 12, 0, 150);
-
-        /** Set how long we are willing to wait for the connection to complete (milliseconds), default is 30000. */
-        pClient->setConnectTimeout(5 * 1000);
-
-        if (!pClient->connect(scanCallbacks.getAdvDevice()))
-        {
-            /** Created a client but failed to connect, don't need to keep it as it has no data */
-            NimBLEDevice::deleteClient(pClient);
-
-            logger.error(RE_TAG, "Failed to connect, deleted client");
-            return false;
-        }
-    }
-
-    if (!pClient->isConnected())
-    {
-        if (!pClient->connect(scanCallbacks.getAdvDevice()))
-        {
-            logger.error(RE_TAG, "Failed to connect");
-            return false;
-        }
-    }
-
-    logger.info(RE_TAG, "Connected to: %s RSSI: %d", pClient->getPeerAddress().toString().c_str(), pClient->getRssi());
-
-    /** Now we can read/write/subscribe the characteristics of the services we are interested in */
-    NimBLERemoteService *pSvc = nullptr;
-    NimBLERemoteCharacteristic *pChr = nullptr;
-
-    pSvc = pClient->getService(serviceUUID);
-
-    if (pSvc)
-    {
-        // Type: notify
-        pChr = pSvc->getCharacteristic(notifyCharacteristicUUID);
-
-        if (pChr)
-        {
-            if (pChr->canRead())
-            {
-                logger.debug(RE_TAG, "%s Value: %s", pChr->getUUID().toString().c_str(), pChr->readValue().c_str());
-            }
-
-            if (pChr->canNotify())
-            {
-                if (!pChr->subscribe(true, notifyCB))
-                {
-                    pClient->disconnect();
-                    return false;
-                }
-
-                logger.info(RE_TAG, "Notifications have been set");
-            }
-            else if (pChr->canIndicate())
-            {
-                /** Send false as first argument to subscribe to indications instead of notifications */
-                if (!pChr->subscribe(false, notifyCB))
-                {
-                    pClient->disconnect();
-                    return false;
-                }
-
-                logger.debug(RE_TAG, "Indications have been set");
-            }
-        }
-    }
-    else
-    {
-        logger.error(RE_TAG, "SwitchBot Bot service not found");
-    }
-
-    logger.info(RE_TAG, "Connected, subscribed to notifications and waiting for a command...");
-
-    return true;
-}
-
-bool executeSwitchBotCommand(std::string cmd)
-{
-    // Establish connection with the client
-    if (!connectToSwitchBot())
-    {
-        logger.error(RE_TAG, "executeSwitchBotCommand: Client not created");
-        return false;
-    }
-
-    NimBLEClient* pClient = NimBLEDevice::getClientByPeerAddress(scanCallbacks.getAdvDevice()->getAddress());
-    
-    if (!pClient)
-    {
-        logger.error(RE_TAG, "executeSwitchBotCommand: Client not exists");
-        return false;
-    }
-    else
-    {
-        if (!pClient->isConnected())
-        {
-            logger.error(RE_TAG, "executeSwitchBotCommand: Client not connected");
-            return false;
-        }
-    }
-
-    NimBLERemoteService *pSvc = nullptr;
-    NimBLERemoteCharacteristic *pChr = nullptr;
-
-    pSvc = pClient->getService(serviceUUID);
-
-    if (pSvc)
-    {
-        // Type: write, write without response
-        pChr = pSvc->getCharacteristic(controlCharacteristicUUID);
-
-        if (pChr)
-        {
-            if (pChr->canRead())
-            {
-                logger.debug(RE_TAG, "%s Value: %s", pChr->getUUID().toString().c_str(), pChr->readValue().c_str());
-            }
-
-            if (pChr->canWrite())
-            {
-                std::vector<uint8_t> vPress = stringToHexArray(cmd);
-                logger.info(RE_TAG, "Command data: %s", NimBLEUtils::dataToHexString(vPress.data(), vPress.size()).c_str());
-
-                // All command for Bot must start with 0x57 byte
-                if (vPress.at(0) != 0x57)
-                {
-                    logger.error(RE_TAG, "Write failed - command must start with 0x57 byte");
-                    return false;
-                }
-
-                if (pChr->writeValue(vPress, true))
-                {
-                    logger.info(RE_TAG, "Wrote new value to: %s", pChr->getUUID().toString().c_str());
-                }
-                else
-                {
-                    pClient->disconnect();
-                    return false;
-                }
-
-                if (pChr->canRead())
-                {
-                    logger.info(RE_TAG, "The value of: %s is now: %s", pChr->getUUID().toString().c_str(), pChr->readValue().c_str());
-                }
-            }
-        }
-    }
-    else
-    {
-        logger.error(RE_TAG, "Switchbot Bot service not found.");
-    }
-
-    return true;
+    logger.debug(RE_TAG, "Updated accessory with BLE data: %s", resultData.c_str());
 }
 
 // Matter & MQTT protocol Endpoint Callback
@@ -432,28 +190,7 @@ void setup()
     // To allow log viewing over the web
     configureWebSerial(config.get<bool>("adm_webserial"), server);
 
-    /** Initialize NimBLE and set the device name */
-    NimBLEDevice::init("SwitchBot-Bot-Client");
-    NimBLEDevice::whiteListAdd(NimBLEAddress(config.getString("bot_mac"), 0));
-    NimBLEDevice::setPower((esp_power_level_t) config.get<int>("bot_txpower"));
-    
-    logger.debug(RE_TAG, "BLE power Tx level: %ld", config.get<int>("bot_txpower"));
-
-    pScan = NimBLEDevice::getScan();
-
-    /** Set the callbacks to call when scan events occur, no duplicates */
-    pScan->setScanCallbacks(&scanCallbacks, false);
-
-    /** Set scan interval (how often) and window (how long) in milliseconds */
-    pScan->setInterval(70);
-    pScan->setWindow(40);
-
-    /**
-     * Active scan will gather scan response data from advertisers
-     *  but will use more energy from both devices
-     */
-    // Do not need active scan, only mac address is important during advertisment process
-    // pScan->setActiveScan(true);
+    bleDevice.initialize(updateAccessoryWithBleData);
 
     onOffPlugin.begin();
     onOffPlugin.onChange(setPluginOnOff);
@@ -473,9 +210,8 @@ void setup()
         logger.debug(RE_TAG, "Matter comission code is: %s", Matter.getManualPairingCode().c_str());
     }
 
-    /** Start scanning for advertisers */ // move this to matter event handler?
-    int scanTimeMs = config.get<int>("bot_scantime");
-    pScan->start(scanTimeMs);
+    // Do not move this line to another place
+    bleDevice.start();
 
     if (config.get<bool>("mqtt_en"))
     {
@@ -498,7 +234,7 @@ void loop()
         ctx.setDoConnect(false);
         
         /** Found a device we want to connect to, do it now */
-        if (executeSwitchBotCommand(ctx.getDoCommand()))
+        if (bleDevice.executeSwitchBotCommand(ctx.getDoCommand()))
         {
             logger.debug(RE_TAG, "Success! we should now be getting notifications");
             

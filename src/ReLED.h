@@ -74,4 +74,6 @@ private:
     Blinkable *statusDevice = nullptr;      // the device used for the Blinker
     bool isRGBLED = false;
     uint8_t ledPin = LED_BUILTIN;
-} ReLED;
+};
+
+inline ReLEDClass ReLED;
