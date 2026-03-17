@@ -8,6 +8,7 @@
 #include <PsychicMqttClient.h>
 #include "ReCommon.h"
 #include "ReBLEUtils.h"
+#include "ReBLEDevice.h"
 #include "ReLED.h"
 #include "ReContext.h"
 #include "ReServer.h"
@@ -18,8 +19,11 @@ static ReContext ctx;
 ReServer* server = nullptr;
 Mycila::ESPConnect* espConnect = nullptr;
 
-static const NimBLEAdvertisedDevice* advDevice = nullptr;
+// static const NimBLEAdvertisedDevice* advDevice = nullptr;
 static NimBLEScan* pScan = nullptr;
+
+ReClientCallbacks clientCallbacks;
+ReScanCallbacks scanCallbacks;
 
 static MatterOnOffPlugin onOffPlugin;
 
@@ -41,71 +45,6 @@ Mycila::Task offMatterSwitchTask("Turn Off", [](void* params){
     LED_COLOR_UPDATE(LED_COLOR_GREEN);
     LED_STATUS_UPDATE(start(LED_BLE_IDLE));
 });
-
-class ClientCallbacks : public NimBLEClientCallbacks
-{
-    void onConnect(NimBLEClient *pClient) override
-    {
-        conTimeout = millis();
-
-        // LED_COLOR_UPDATE(LED_COLOR_RED);
-        // LED_STATUS_UPDATE(start(LED_AP_CONNECTED));
-    }
-
-    void onDisconnect(NimBLEClient *pClient, int reason) override
-    {
-        uint64_t tm = millis() - conTimeout;
-
-        logger.info(RE_TAG, "%s Disconnected, reason = %d, timeout = %lld", 
-            pClient->getPeerAddress().toString().c_str(), reason, tm);
-        
-        LED_COLOR_UPDATE(LED_COLOR_GREEN);
-        LED_STATUS_UPDATE(on());
-    }
-
-    private:
-        uint64_t conTimeout = 0;
-
-} clientCallbacks;
-
-/** Define a class to handle the callbacks when scan events are received */
-class ScanCallbacks : public NimBLEScanCallbacks
-{
-    void onResult(const NimBLEAdvertisedDevice *advertisedDevice) override
-    {
-        // This is a device with our MAC address
-        std::string botMacAddr = config.getString("bot_mac");
-        // Convert to lowercase because NimBLE returns mac address in lowercase
-        std::transform(botMacAddr.begin(), botMacAddr.end(), botMacAddr.begin(), ::tolower);
-
-        if (advertisedDevice->getAddress().toString() == botMacAddr)
-        {
-            logger.info(RE_TAG, "Advertised Device found: %s", advertisedDevice->getAddress().toString().c_str());
-
-            /** stop scan before connecting */
-            NimBLEDevice::getScan()->stop();
-
-            /** Save the device reference in a global for the client to use*/
-            advDevice = advertisedDevice;
-            
-            ctx.setBleDeviceFound(true);
-
-            LED_COLOR_UPDATE(LED_COLOR_GREEN);
-            LED_STATUS_UPDATE(on());
-        }
-    }
-
-    /** Callback to process the results of the completed scan or restart it */
-    void onScanEnd(const NimBLEScanResults &results, int reason) override
-    {
-        logger.info(RE_TAG, "Scan Ended, reason: %d, device count: %d; Restarting scan\n", reason, results.getCount());
-        int scanTimeMs = config.get<int>("bot_scantime");
-        NimBLEDevice::getScan()->start(scanTimeMs, false, true);
-
-        LED_COLOR_UPDATE(LED_COLOR_GREEN);
-        LED_STATUS_UPDATE(start(LED_BLE_SCANNING));
-    }
-} scanCallbacks;
 
 /** Notification / Indication receiving handler callback */
 void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify)
@@ -144,7 +83,7 @@ bool connectToSwitchBot()
          *  second argument in connect() to prevent refreshing the service database.
          *  This saves considerable time and power.
          */
-        pClient = NimBLEDevice::getClientByPeerAddress(advDevice->getAddress());
+        pClient = NimBLEDevice::getClientByPeerAddress(scanCallbacks.getAdvDevice()->getAddress());
 
         if (pClient)
         {
@@ -155,7 +94,7 @@ bool connectToSwitchBot()
             } 
             else
             {
-                if (!pClient->connect(advDevice, false))
+                if (!pClient->connect(scanCallbacks.getAdvDevice(), false))
                 {
                     logger.error(RE_TAG, "Reconnect failed");
                     return false;
@@ -199,7 +138,7 @@ bool connectToSwitchBot()
         /** Set how long we are willing to wait for the connection to complete (milliseconds), default is 30000. */
         pClient->setConnectTimeout(5 * 1000);
 
-        if (!pClient->connect(advDevice))
+        if (!pClient->connect(scanCallbacks.getAdvDevice()))
         {
             /** Created a client but failed to connect, don't need to keep it as it has no data */
             NimBLEDevice::deleteClient(pClient);
@@ -211,7 +150,7 @@ bool connectToSwitchBot()
 
     if (!pClient->isConnected())
     {
-        if (!pClient->connect(advDevice))
+        if (!pClient->connect(scanCallbacks.getAdvDevice()))
         {
             logger.error(RE_TAG, "Failed to connect");
             return false;
@@ -280,7 +219,7 @@ bool executeSwitchBotCommand(std::string cmd)
         return false;
     }
 
-    NimBLEClient* pClient = NimBLEDevice::getClientByPeerAddress(advDevice->getAddress());
+    NimBLEClient* pClient = NimBLEDevice::getClientByPeerAddress(scanCallbacks.getAdvDevice()->getAddress());
     
     if (!pClient)
     {
