@@ -10,11 +10,8 @@ public:
     ReServer(uint16_t port);
 
     void begin();
-
     void setESPConnect(Mycila::ESPConnect *esp);
-
     void pressRequestNotifyJson(const std::string& resultData);
-    // AsyncWebServerRequestPtr getPressRequest();
 
 private:
     void setAuthenticationMiddleware();

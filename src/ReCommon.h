@@ -12,6 +12,9 @@
 
 #define RE_TASK_RESUME_TIME_MS 5000
 
+#define BOT_PRESS_COMMAND "570100" // this is the command to press the bot
+#define BOT_STATUS_COMMAND "570200" // this is the command to get the bot status
+
 extern const uint8_t settings_html_start[] asm("_binary__pio_embed_settings_html_gz_start");
 extern const uint8_t settings_html_end[] asm("_binary__pio_embed_settings_html_gz_end");
 
