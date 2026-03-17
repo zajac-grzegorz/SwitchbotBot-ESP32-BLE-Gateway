@@ -201,7 +201,7 @@ void ReServer::adminDecommissionHandler(AsyncWebServerRequest *request)
 
 void ReServer::switchbotPressHandler(AsyncWebServerRequest *request)
 {
-    ctx.setDoCommand("570100");
+    ctx.setDoCommand(BOT_PRESS_COMMAND);
 
     if (ctx.getBleDeviceFound())
     {

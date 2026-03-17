@@ -33,6 +33,11 @@ Mycila::Task offMatterSwitchTask("Turn Off", [](void* params){
     onOffPlugin.setOnOff(false);
     onOffPlugin.updateAccessory();
 
+    if (config.get<bool>("mqtt_en"))
+    {
+        mqttClient.publish("blegateway/result", 1, true, "OK"); 
+    }
+
     LED_COLOR_UPDATE(LED_COLOR_GREEN);
     LED_STATUS_UPDATE(start(LED_BLE_IDLE));
 });
@@ -345,18 +350,51 @@ bool executeSwitchBotCommand(std::string cmd)
     return true;
 }
 
-// Matter Protocol Endpoint Callback
+// Matter & MQTT protocol Endpoint Callback
 bool setPluginOnOff(bool state) {
     logger.info(RE_TAG, "User Callback :: New Plugin State = %s", state ? "ON" : "OFF");
   
-    ctx.setDoCommand("570100");
+    ctx.setDoCommand(BOT_PRESS_COMMAND);
 
-    if (state && advDevice)
+    if (state && ctx.getBleDeviceFound())
     {
         ctx.setDoConnect(true);
     }
 
     return true;
+}
+
+void setupMqttClient()
+{
+    std::string mqttIp = config.getString("mqtt_ip");
+    std::string mqttServer = "mqtt://" + mqttIp + ":" + std::to_string(config.get<int>("mqtt_port"));
+    mqttClient.setServer(mqttServer.c_str());
+    mqttClient.setCredentials(config.getString("mqtt_user"), config.getString("mqtt_pass"));
+    mqttClient.setClientId("BLEGateway");
+    mqttClient.setCleanSession(false);
+    mqttClient.setKeepAlive(60);
+    mqttClient.setWill("blegateway/status", 1, true, "BLEGateway OFFLINE");
+
+    mqttClient.onTopic("blegateway/control", 2, [&](const char *topic, const char *payload, int retain, int qos, bool dup)
+        {
+            logger.debug(RE_TAG, "Received Topic: %s", topic);
+            logger.debug(RE_TAG, "Received Payload: %s", payload);
+
+            if (!strcmp(payload, BOT_PRESS_COMMAND))
+            {
+                setPluginOnOff(true);
+            }
+        });
+
+    mqttClient.onConnect([&](bool sessionPresent)
+        {
+            logger.debug(RE_TAG, "MQTT connected: %s, sessionPresent: %d", mqttClient.connected() ? "YES" : "NO", sessionPresent);
+            logger.debug(RE_TAG, "MQTT clientID: %s", mqttClient.getClientId());
+            
+            mqttClient.publish("blegateway/status", 1, true, "BLEGateway: ONLINE"); 
+        });
+
+    mqttClient.connect();
 }
 
 void setup()
@@ -396,14 +434,11 @@ void setup()
     // load configuration data from NVS
     configureStorage();
 
+    // setup the Async Web Server and ESPConnect for network management
+    // do not change to order of these, as the server needs to be initialized before ESPConnect 
+    // can use it for captive portal and config, and ESPConnect needs to be initialized before the 
+    // server can use it for network state listening
     server = new ReServer(config.get<int>("dev_port"));
-
-    offMatterSwitchTask.setEnabled(true);
-    offMatterSwitchTask.setType(Mycila::Task::Type::ONCE);
-
-    offMatterSwitchTask.onDone([](const Mycila::Task& me, uint32_t elapsed) {
-        logger.debug(RE_TAG, "Task '%s' executed in %ld us", me.name(), elapsed);
-    });
 
     espConnect = new Mycila::ESPConnect(*server);
 
@@ -432,7 +467,6 @@ void setup()
         JsonDocument doc;
         espConnect->toJson(doc.to<JsonObject>());
         serializeJsonPretty(doc, Serial);
-        Serial.println();
     });
 
     espConnect->setAutoRestart(true);
@@ -444,10 +478,20 @@ void setup()
 
     server->begin();
 
+    logger.debug(RE_TAG, "Async Web Server started");
+
+    // setup the task to turn off the Matter switch after a delay, 
+    // in case something goes wrong with the BLE connection and it doesn't get turned off properly. 
+    // This is a safety mechanism to prevent the switch from being stuck on if there is an issue.
+    offMatterSwitchTask.setEnabled(true);
+    offMatterSwitchTask.setType(Mycila::Task::Type::ONCE);
+
+    offMatterSwitchTask.onDone([](const Mycila::Task& me, uint32_t elapsed) {
+        logger.debug(RE_TAG, "Task '%s' executed in %ld us", me.name(), elapsed);
+    });
+
     // To allow log viewing over the web
     configureWebSerial(config.get<bool>("adm_webserial"), server);
-
-    logger.debug(RE_TAG, "Async Web Server started");
 
     /** Initialize NimBLE and set the device name */
     NimBLEDevice::init("SwitchBot-Bot-Client");
@@ -477,6 +521,7 @@ void setup()
 
     // Matter beginning - Last step, after all EndPoints are initialized
     Matter.begin();
+
     // This may be a restart of a already commissioned Matter accessory
     if (Matter.isDeviceCommissioned()) 
     {
@@ -495,28 +540,7 @@ void setup()
 
     if (config.get<bool>("mqtt_en"))
     {
-        mqttClient.setServer("mqtt://192.168.68.100:1883");
-        mqttClient.setCredentials("reapartment", "reapartment");
-        mqttClient.setClientId("BLEGateway");
-        mqttClient.setCleanSession(false);
-        mqttClient.setKeepAlive(60);
-        mqttClient.setWill("blegateway/status", 1, true, "BLEGateway OFFLINE");
-
-        mqttClient.onTopic("blegateway/control", 2, [&](const char *topic, const char *payload, int retain, int qos, bool dup) 
-        {
-            logger.debug(RE_TAG, "Received Topic: %s", topic);
-            logger.debug(RE_TAG, "Received Payload: %s", payload); 
-        });
-
-        mqttClient.onConnect([&](bool sessionPresent) {
-            logger.debug(RE_TAG, "MQTT connected: %s, sessionPresent: %d", 
-                mqttClient.connected() ? "YES" : "NO", sessionPresent);
-            logger.debug(RE_TAG, "MQTT clientID: %s", mqttClient.getClientId());
-            
-            mqttClient.publish("blegateway/status", 1, true, "BLEGateway: ONLINE");
-        });
-
-        mqttClient.connect();
+        setupMqttClient();
     }
 
     LED_COLOR_UPDATE(LED_COLOR_GREEN);
