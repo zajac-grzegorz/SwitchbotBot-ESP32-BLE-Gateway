@@ -20,12 +20,15 @@ Mycila::ESPConnect* espConnect = nullptr;
 Mycila::Task offSwitchTask("Turn Off", [](void* params){
     logger.info(RE_TAG, "-> OFF Switch to false");
 
-    onOffPlugin.setOnOff(false);
-    onOffPlugin.updateAccessory();
+    if (config.get<bool>("dev_matter"))
+    {
+        onOffPlugin.setOnOff(false);
+        onOffPlugin.updateAccessory();
+    }
 
     if (config.get<bool>("mqtt_en"))
     {
-        mqttClient.publish("blegateway/result", 1, true, "OK"); 
+        mqttClient.publish("blegateway/result", 1, true, (char*)params); 
     }
 
     LED_COLOR_UPDATE(LED_COLOR_GREEN);
@@ -39,6 +42,7 @@ void updateAndNotifyWithBleData(std::string& resultData)
     server->pressRequestNotifyJson(resultData);
 
     offSwitchTask.resume(RE_TASK_RESUME_TIME_MS);
+    offSwitchTask.setData((void*)resultData.c_str());
 
     logger.debug(RE_TAG, "Updated accessory with BLE data: %s", resultData.c_str());
 }
@@ -195,23 +199,28 @@ void setup()
     // Do not move this line to another place, as the BLE device needs to be initialized before Matter 
     bleDevice.initialize(updateAndNotifyWithBleData);
 
-    // Start the Matter On/Off Plugin EndPoint and set the user callback for when the state is changed by the Matter Controller
-    onOffPlugin.begin();
-    onOffPlugin.onChange(setPluginOnOff);
-
-    // Matter beginning - Last step, after all EndPoints are initialized
-    Matter.begin();
-
-    // This may be a restart of a already commissioned Matter accessory
-    if (Matter.isDeviceCommissioned()) 
+    if (config.get<bool>("dev_matter"))
     {
-        logger.debug(RE_TAG, "Matter Node is commissioned and connected to the network. Ready for use");
-        logger.debug(RE_TAG, "Initial state: %s", onOffPlugin.getOnOff() ? "ON" : "OFF");
-        onOffPlugin.updateAccessory();  // configure the Plugin based on initial state
-    }
-    else
-    {
-        logger.debug(RE_TAG, "Matter comission code is: %s", Matter.getManualPairingCode().c_str());
+        logger.debug(RE_TAG, "Initializing Matter On/Off Plugin EndPoint");
+
+        // Start the Matter On/Off Plugin EndPoint and set the user callback for when the state is changed by the Matter Controller
+        onOffPlugin.begin();
+        onOffPlugin.onChange(setPluginOnOff);
+
+        // Matter beginning - Last step, after all EndPoints are initialized
+        Matter.begin();
+
+        // This may be a restart of a already commissioned Matter accessory
+        if (Matter.isDeviceCommissioned()) 
+        {
+            logger.debug(RE_TAG, "Matter Node is commissioned and connected to the network. Ready for use");
+            logger.debug(RE_TAG, "Initial state: %s", onOffPlugin.getOnOff() ? "ON" : "OFF");
+            onOffPlugin.updateAccessory();  // configure the Plugin based on initial state
+        }
+        else
+        {
+            logger.debug(RE_TAG, "Matter comission code is: %s", Matter.getManualPairingCode().c_str());
+        }
     }
 
     // Do not move this line to another place
