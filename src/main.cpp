@@ -261,10 +261,12 @@ void loop()
 
             LED_COLOR_UPDATE(LED_COLOR_RED);
             LED_STATUS_UPDATE(start(LED_BLE_ALERT));
+            
+            std::string resultData = "ERError with connection to Switchbot";
 
             offSwitchTask.resume(RE_TASK_RESUME_TIME_MS);
+            offSwitchTask.setData((void*)resultData.c_str());
 
-            std::string resultData = "ERError with connection to Switchbot";
             server->pressRequestNotifyJson(resultData);
         }
     }
