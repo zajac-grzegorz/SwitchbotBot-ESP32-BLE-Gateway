@@ -1,27 +1,23 @@
 #include <Arduino.h>
 #include <Matter.h>
 #include <MycilaESPConnect.h>
-#include <MycilaSystem.h>
 #include <MycilaTaskManager.h>
-#include <MycilaWebSerial.h>
 #include <PsychicMqttClient.h>
-#include "ReCommon.h"
-#include "ReBLEUtils.h"
 #include "ReBLEDevice.h"
+#include "ReBLEUtils.h"
 #include "ReLED.h"
-#include "ReContext.h"
 #include "ReServer.h"
 
 static PsychicMqttClient mqttClient;
 static ReContext ctx;
 static ReBLEDevice bleDevice;
+static MatterOnOffPlugin onOffPlugin;
 
 ReServer* server = nullptr;
 Mycila::ESPConnect* espConnect = nullptr;
 
-static MatterOnOffPlugin onOffPlugin;
-
-Mycila::Task offMatterSwitchTask("Turn Off", [](void* params){
+// Task to turn off the switch and update the state after a delay
+Mycila::Task offSwitchTask("Turn Off", [](void* params){
     logger.info(RE_TAG, "-> OFF Switch to false");
 
     onOffPlugin.setOnOff(false);
@@ -37,12 +33,12 @@ Mycila::Task offMatterSwitchTask("Turn Off", [](void* params){
 });
 
 
-/** Notification / Indication receiving handler callback */
-void updateAccessoryWithBleData(std::string& resultData)
+// Notification receiving handler callback
+void updateAndNotifyWithBleData(std::string& resultData)
 {
     server->pressRequestNotifyJson(resultData);
 
-    offMatterSwitchTask.resume(RE_TASK_RESUME_TIME_MS);
+    offSwitchTask.resume(RE_TASK_RESUME_TIME_MS);
 
     logger.debug(RE_TAG, "Updated accessory with BLE data: %s", resultData.c_str());
 }
@@ -63,6 +59,11 @@ bool setPluginOnOff(bool state) {
 
 void setupMqttClient()
 {
+    if (false == config.get<bool>("mqtt_en"))
+    {
+        return;
+    }
+
     std::string mqttIp = config.getString("mqtt_ip");
     std::string mqttServer = "mqtt://" + mqttIp + ":" + std::to_string(config.get<int>("mqtt_port"));
     mqttClient.setServer(mqttServer.c_str());
@@ -128,10 +129,10 @@ void setup()
 
     logger.debug(RE_TAG, "Starting BLE and Matter ESP32 Gateway to Switchbot Bot");
 
-    // load configuration data from NVS
+    // Load configuration data from NVS
     configureStorage();
 
-    // setup the Async Web Server and ESPConnect for network management
+    // Setup the Async Web Server and ESPConnect for network management
     // do not change to order of these, as the server needs to be initialized before ESPConnect 
     // can use it for captive portal and config, and ESPConnect needs to be initialized before the 
     // server can use it for network state listening
@@ -141,7 +142,7 @@ void setup()
 
     server->setESPConnect(espConnect);
     
-    // network state listener
+    // Network state listener
     espConnect->listen([&](__unused Mycila::ESPConnect::State previous, __unused Mycila::ESPConnect::State state) 
     {
         switch (state)
@@ -166,6 +167,7 @@ void setup()
         serializeJsonPretty(doc, Serial);
     });
 
+    // Setup and start ESPConnect with the configuration loaded from NVS, or start captive portal if no config or connection fails
     espConnect->setAutoRestart(true);
     espConnect->setConnectTimeout(300);
     espConnect->setBlocking(true);
@@ -173,25 +175,27 @@ void setup()
     espConnect->begin("BLEGateway", "BLEGateway");
     logger.debug(RE_TAG, "ESPConnect completed, continuing setup()...");
 
+    // Start the Async Web Server
     server->begin();
-
     logger.debug(RE_TAG, "Async Web Server started");
 
-    // setup the task to turn off the Matter switch after a delay, 
+    // Setup the task to turn off the Matter switch and publish MQTT status after a delay, 
     // in case something goes wrong with the BLE connection and it doesn't get turned off properly. 
     // This is a safety mechanism to prevent the switch from being stuck on if there is an issue.
-    offMatterSwitchTask.setEnabled(true);
-    offMatterSwitchTask.setType(Mycila::Task::Type::ONCE);
+    offSwitchTask.setEnabled(true);
+    offSwitchTask.setType(Mycila::Task::Type::ONCE);
 
-    offMatterSwitchTask.onDone([](const Mycila::Task& me, uint32_t elapsed) {
+    offSwitchTask.onDone([](const Mycila::Task& me, uint32_t elapsed) {
         logger.debug(RE_TAG, "Task '%s' executed in %ld us", me.name(), elapsed);
     });
 
     // To allow log viewing over the web
     configureWebSerial(config.get<bool>("adm_webserial"), server);
 
-    bleDevice.initialize(updateAccessoryWithBleData);
+    // Do not move this line to another place, as the BLE device needs to be initialized before Matter 
+    bleDevice.initialize(updateAndNotifyWithBleData);
 
+    // Start the Matter On/Off Plugin EndPoint and set the user callback for when the state is changed by the Matter Controller
     onOffPlugin.begin();
     onOffPlugin.onChange(setPluginOnOff);
 
@@ -213,11 +217,10 @@ void setup()
     // Do not move this line to another place
     bleDevice.start();
 
-    if (config.get<bool>("mqtt_en"))
-    {
-        setupMqttClient();
-    }
+    // If MQTT is enabled in config, setup the MQTT client and connect to the broker
+    setupMqttClient();
 
+    // Update the LED to indicate we are ready and waiting for BLE connection and commands
     LED_COLOR_UPDATE(LED_COLOR_GREEN);
     LED_STATUS_UPDATE(start(LED_BLE_SCANNING));
 }
@@ -226,14 +229,15 @@ void loop()
 {
     espConnect->loop();
     
-    offMatterSwitchTask.tryRun();
+    offSwitchTask.tryRun();
     ReLED.getStatusLED()->check();
     
+    // There is a request to connect to the BLE device and execute the command
     if (ctx.getDoConnect())
     {
         ctx.setDoConnect(false);
         
-        /** Found a device we want to connect to, do it now */
+        // Found a device we want to connect to, do it now
         if (bleDevice.executeSwitchBotCommand(ctx.getDoCommand()))
         {
             logger.debug(RE_TAG, "Success! we should now be getting notifications");
@@ -241,6 +245,7 @@ void loop()
             LED_COLOR_UPDATE(LED_COLOR_ORANGE);
             LED_STATUS_UPDATE(start(LED_BLE_PROCESSING));
         }
+        // If we failed to connect or execute the command, we should reset the state and notify the user
         else
         {
             logger.error(RE_TAG, "Failed to connect");
@@ -248,7 +253,7 @@ void loop()
             LED_COLOR_UPDATE(LED_COLOR_RED);
             LED_STATUS_UPDATE(start(LED_BLE_ALERT));
 
-            offMatterSwitchTask.resume(RE_TASK_RESUME_TIME_MS);
+            offSwitchTask.resume(RE_TASK_RESUME_TIME_MS);
 
             std::string resultData = "ERError with connection to Switchbot";
             server->pressRequestNotifyJson(resultData);
