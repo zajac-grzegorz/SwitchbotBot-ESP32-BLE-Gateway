@@ -7,6 +7,7 @@ void configureStorage()
    config.configure("net_ssid", "");
    config.configure("net_pass", "");
    config.configure("dev_port", 80);
+   config.configure("dev_matter", false);
    config.configure("mqtt_en", false);
    config.configure("mqtt_ip", "");
    config.configure("mqtt_port", 1883);
