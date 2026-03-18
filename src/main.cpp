@@ -47,17 +47,27 @@ void updateAndNotifyWithBleData(std::string& resultData)
     logger.debug(RE_TAG, "Updated accessory with BLE data: %s", resultData.c_str());
 }
 
+// Set flags to execute the command in the main loop
+void executeBotCommand(const std::string& command)
+{
+    if (ctx.getBleDeviceFound())
+    {
+        ctx.setDoCommand(command);
+        ctx.setDoConnect(true);
+    }
+}   
+
 // Matter & MQTT protocol Endpoint Callback
 bool setPluginOnOff(bool state) {
     logger.info(RE_TAG, "User Callback :: New Plugin State = %s", state ? "ON" : "OFF");
   
-    ctx.setDoCommand(BOT_PRESS_COMMAND);
-
-    if (state && ctx.getBleDeviceFound())
+    if (false == state)
     {
-        ctx.setDoConnect(true);
+        return false;
     }
 
+    executeBotCommand(BOT_PRESS_COMMAND);
+    
     return true;
 }
 
@@ -82,9 +92,14 @@ void setupMqttClient()
             logger.debug(RE_TAG, "Received Topic: %s", topic);
             logger.debug(RE_TAG, "Received Payload: %s", payload);
 
-            if (!strcmp(payload, BOT_PRESS_COMMAND))
+            if (!strcmp(payload, BOT_PRESS_COMMAND) || !strcmp(payload, BOT_STATUS_COMMAND))
             {
-                setPluginOnOff(true);
+                executeBotCommand(payload);
+            }
+            else
+            {
+                logger.warn(RE_TAG, "Unknown command received over MQTT: %s", payload);
+                mqttClient.publish("blegateway/result", 1, true, "ERUnknown command received over MQTT"); 
             }
         });
 
