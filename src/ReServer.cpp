@@ -141,6 +141,7 @@ void ReServer::adminSettingsGetHandler(AsyncWebServerRequest *request)
     doc["network"]["ssid"] = config.getString("net_ssid");
     doc["network"]["password"] = config.getString("net_pass");
     doc["device"]["port_web"] = config.get<int>("dev_port");
+    doc["device"]["matter"] = config.get<bool>("dev_matter");
     doc["mqtt"]["enable"] = config.get<bool>("mqtt_en");
     doc["mqtt"]["ip"] = config.getString("mqtt_ip");
     doc["mqtt"]["port"] = config.get<int>("mqtt_port");
@@ -163,6 +164,7 @@ void ReServer::adminSettingsPostHandler(AsyncWebServerRequest *request, JsonVari
     config.setString("net_ssid", doc["network"]["ssid"].as<const char *>());
     config.setString("net_pass", doc["network"]["password"].as<const char *>());
     config.set<int>("dev_port", doc["device"]["port_web"].as<int>());
+    config.set<bool>("dev_matter", doc["device"]["matter"].as<bool>());
     config.set<bool>("mqtt_en", doc["mqtt"]["enable"].as<bool>());
     config.setString("mqtt_ip", doc["mqtt"]["ip"].as<const char *>());
     config.set<int>("mqtt_port", doc["mqtt"]["port"].as<int>());
