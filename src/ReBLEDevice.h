@@ -51,4 +51,6 @@ private:
     BleDataCallback bleDataCallback { nullptr };
 
     NimBLEScan* pScan = nullptr;
+    std::string resultData;
+
 };

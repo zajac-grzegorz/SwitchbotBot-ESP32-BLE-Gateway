@@ -104,7 +104,7 @@ void ReBLEDevice::notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, ui
     str = "** Characteristic = " + pRemoteCharacteristic->getUUID().toString();
     logger.debug(RE_TAG, "%s", str.c_str());
 
-    std::string resultData = NimBLEUtils::dataToHexString(pData, length);
+    resultData = NimBLEUtils::dataToHexString(pData, length);
 
     str = "*** Value = " + resultData;
     logger.info(RE_TAG, "%s", str.c_str());

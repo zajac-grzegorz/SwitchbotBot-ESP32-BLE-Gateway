@@ -44,7 +44,7 @@ void updateAndNotifyWithBleData(std::string& resultData)
     offSwitchTask.resume(RE_TASK_RESUME_TIME_MS);
     offSwitchTask.setData((void*)resultData.c_str());
 
-    logger.debug(RE_TAG, "Updated accessory with BLE data: %s", resultData.c_str());
+    logger.info(RE_TAG, "Updated accessory with BLE data: %s", resultData.c_str());
 }
 
 // Set flags to execute the command in the main loop
@@ -57,13 +57,13 @@ void executeBotCommand(const std::string& command)
     }
 }   
 
-// Matter & MQTT protocol Endpoint Callback
+// Matter protocol Endpoint Callback
 bool setPluginOnOff(bool state) {
     logger.info(RE_TAG, "User Callback :: New Plugin State = %s", state ? "ON" : "OFF");
   
     if (false == state)
     {
-        return false;
+        return true;
     }
 
     executeBotCommand(BOT_PRESS_COMMAND);
