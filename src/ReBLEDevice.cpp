@@ -32,6 +32,20 @@ void ReScanCallbacks::onResult(const NimBLEAdvertisedDevice *advertisedDevice)
     {
         logger.info(RE_TAG, "Advertised Device found: %s", advertisedDevice->getAddress().toString().c_str());
 
+        // Get battery level from the service data in the advertisement packet
+        if (advertisedDevice->haveServiceData())
+        {
+            std::string payload = advertisedDevice->getServiceData();
+            uint8_t batteryLevel = 0;
+
+            if (payload.length() >= 3) // Check if payload has enough data for battery level
+            {
+                batteryLevel = payload[2] & 0x7F; // Assuming battery level is the third byte in the service data
+            }
+
+            logger.info(RE_TAG, "Battery level: %d", batteryLevel);
+        }
+
         /** stop scan before connecting */
         NimBLEDevice::getScan()->stop();
 
@@ -78,10 +92,10 @@ void ReBLEDevice::initialize(BleDataCallback callback)
 
     /**
      * Active scan will gather scan response data from advertisers
-     *  but will use more energy from both devices
+     * but will use more energy from both devices
      */
-    // Do not need active scan, only mac address is important during advertisment process
-    // pScan->setActiveScan(true);
+    // Need active scan to get the service data which contains the battery level
+    pScan->setActiveScan(true);
 }
 
 void ReBLEDevice::start()

@@ -52,5 +52,5 @@ private:
 
     NimBLEScan* pScan = nullptr;
     std::string resultData;
-
+    uint8_t batteryLevel = 0;
 };
