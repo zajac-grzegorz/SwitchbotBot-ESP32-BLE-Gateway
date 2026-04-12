@@ -177,6 +177,15 @@ void setup()
             case Mycila::ESPConnect::State::NETWORK_CONNECTED:
                 LED_STATUS_UPDATE(on());
                 break;
+            case Mycila::ESPConnect::State::PORTAL_COMPLETE: {
+                logger.debug(RE_TAG, "Captive Portal has ended, save the configuration...");
+                
+                espConnect->saveConfiguration();
+
+                config.setString("net_ssid", espConnect->getConfig().wifiSSID.c_str());
+                config.setString("net_pass", espConnect->getConfig().wifiPassword.c_str());
+                break;
+            }
             default:
                 break;
         }
@@ -186,12 +195,19 @@ void setup()
         serializeJsonPretty(doc, Serial);
     });
 
+    Mycila::ESPConnect::Config espConnectConfig;
+    espConnect->loadConfiguration(espConnectConfig);
+    espConnectConfig.hostname = "BLEGateway";
+    espConnectConfig.wifiSSID = config.getString("net_ssid");
+    espConnectConfig.wifiPassword = config.getString("net_pass");
+
     // Setup and start ESPConnect with the configuration loaded from NVS, or start captive portal if no config or connection fails
     espConnect->setAutoRestart(true);
     espConnect->setConnectTimeout(300);
     espConnect->setBlocking(true);
     logger.debug(RE_TAG, "Trying to connect to saved WiFi or will start portal...");
     espConnect->begin("BLEGateway", "BLEGateway");
+    // espConnect->begin("BLEGateway", "", espConnectConfig);
     logger.debug(RE_TAG, "ESPConnect completed, continuing setup()...");
 
     // Start the Async Web Server

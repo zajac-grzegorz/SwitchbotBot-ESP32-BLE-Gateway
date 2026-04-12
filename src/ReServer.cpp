@@ -56,7 +56,7 @@ void ReServer::setHandlers()
 
     on("/heap", HTTP_GET, (ArRequestHandlerFunction)std::bind(&ReServer::heapHandler, this, std::placeholders::_1));
 
-    on("admin/clear", HTTP_GET, (ArRequestHandlerFunction)std::bind(&ReServer::adminClearHandler, this, std::placeholders::_1))
+    on("/admin/clear", HTTP_GET, (ArRequestHandlerFunction)std::bind(&ReServer::adminClearHandler, this, std::placeholders::_1))
         .addMiddleware(&basicAuth);
 
     on(AsyncURIMatcher::exact("/admin"), HTTP_GET, (ArRequestHandlerFunction)std::bind(&ReServer::adminHandler, this, std::placeholders::_1))
