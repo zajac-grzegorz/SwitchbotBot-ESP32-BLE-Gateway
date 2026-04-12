@@ -135,14 +135,6 @@
             }
           ]
         }
-      ],
-      "buttons": [
-        {
-          "label": "Test Connection",
-          "method": "POST",
-          "endpoint": "/test_cloud",
-          "includeForm": true
-        }
       ]
     },
     {
