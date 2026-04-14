@@ -55,6 +55,8 @@ void ReServer::setHandlers()
     onNotFound(std::bind(&ReServer::handleNotFound, this, std::placeholders::_1));
 
     on("/heap", HTTP_GET, (ArRequestHandlerFunction)std::bind(&ReServer::heapHandler, this, std::placeholders::_1));
+    on("/admin/info", HTTP_GET, (ArRequestHandlerFunction)std::bind(&ReServer::wifiInfoHandler, this, std::placeholders::_1))
+        .addMiddleware(&basicAuth);
 
     on("/admin/clear", HTTP_GET, (ArRequestHandlerFunction)std::bind(&ReServer::adminClearHandler, this, std::placeholders::_1))
         .addMiddleware(&basicAuth);
@@ -114,6 +116,16 @@ void ReServer::heapHandler(AsyncWebServerRequest *request)
 
     String output;
     serializeJson(doc, output);
+    request->send(200, "application/json", output);
+}
+
+void ReServer::wifiInfoHandler(AsyncWebServerRequest *request)
+{
+    String output;
+    JsonDocument doc;
+    espConnect->toJson(doc.to<JsonObject>());
+
+    serializeJsonPretty(doc, output);
     request->send(200, "application/json", output);
 }
 

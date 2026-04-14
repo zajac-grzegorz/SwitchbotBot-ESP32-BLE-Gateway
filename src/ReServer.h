@@ -20,6 +20,7 @@ private:
     void handleRoot(AsyncWebServerRequest *request);
     void handleNotFound(AsyncWebServerRequest *request);
     void heapHandler(AsyncWebServerRequest *request);
+    void wifiInfoHandler(AsyncWebServerRequest *request);
     void adminClearHandler(AsyncWebServerRequest *request);
     void adminHandler(AsyncWebServerRequest *request);
     void adminSettingsGetHandler(AsyncWebServerRequest *request);

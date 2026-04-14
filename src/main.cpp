@@ -206,8 +206,7 @@ void setup()
     espConnect->setConnectTimeout(300);
     espConnect->setBlocking(true);
     logger.debug(RE_TAG, "Trying to connect to saved WiFi or will start portal...");
-    espConnect->begin("BLEGateway", "BLEGateway");
-    // espConnect->begin("BLEGateway", "", espConnectConfig);
+    espConnect->begin("BLEGateway", "", espConnectConfig);
     logger.debug(RE_TAG, "ESPConnect completed, continuing setup()...");
 
     // Start the Async Web Server
