@@ -28,7 +28,7 @@ Mycila::Task offSwitchTask("Turn Off", [](void* params){
 
     if (config.get<bool>("mqtt_en"))
     {
-        mqttClient.publish("blegateway/result", 1, true, (char*)params); 
+        mqttClient.publish("blegateway/result", 1, false, (char*)params); 
     }
 
     LED_COLOR_UPDATE(LED_COLOR_GREEN);
